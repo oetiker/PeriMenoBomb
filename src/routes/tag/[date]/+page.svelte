@@ -4,16 +4,21 @@
   import SymptomSheet from '$lib/components/SymptomSheet/SymptomSheet.svelte';
   import EntryEditor from '$lib/components/EntryEditor/EntryEditor.svelte';
   import Fab from '$lib/components/ui/Fab.svelte';
+  import FirstRun from '$lib/components/DayView/FirstRun.svelte';
   import { currentDate } from '$lib/stores/currentDate.svelte';
-  import { liveQueryEffect } from '$lib/stores/liveQuery.svelte';
+  import { liveQuery, liveQueryEffect } from '$lib/stores/liveQuery.svelte';
   import { db, type Symptom, type Entry } from '$lib/db';
   import { listEntriesForDate, upsertEntry } from '$lib/db/entries';
+  import { getOrDefault } from '$lib/db/meta';
 
   let { data } = $props();
   $effect(() => { currentDate.set(data.date); });
 
   let sheetOpen = $state(false);
   let editing = $state<{ symptom: Symptom } | null>(null);
+
+  const firstRunQ = liveQuery(async () => await getOrDefault('firstRunCompleted', false), false);
+  $effect(() => () => firstRunQ.dispose());
 
   const entriesQ = liveQueryEffect(() => listEntriesForDate(currentDate.value), [] as Entry[]);
   const symptomsQ = liveQueryEffect(() => db.symptoms.toArray(), [] as Symptom[]);
@@ -27,13 +32,17 @@
   }
 </script>
 
-<DateHeader />
-<EntryList date={currentDate.value} />
+{#if !firstRunQ.current}
+  <FirstRun />
+{:else}
+  <DateHeader />
+  <EntryList date={currentDate.value} />
 
-<Fab onClick={() => sheetOpen = true} />
+  <Fab onClick={() => sheetOpen = true} />
 
-<SymptomSheet open={sheetOpen} onClose={() => sheetOpen = false} {onPick} {enteredIds} />
+  <SymptomSheet open={sheetOpen} onClose={() => sheetOpen = false} {onPick} {enteredIds} />
 
-{#if editing}
-  <EntryEditor open={true} date={currentDate.value} symptom={editing.symptom} onClose={() => editing = null} />
+  {#if editing}
+    <EntryEditor open={true} date={currentDate.value} symptom={editing.symptom} onClose={() => editing = null} />
+  {/if}
 {/if}
