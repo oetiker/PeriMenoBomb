@@ -2,5 +2,6 @@ import { test, expect } from '@playwright/test';
 
 test('app loads', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('h1')).toContainText('PeriMenoBomb');
+  await page.waitForURL(/\/tag\/\d{4}-\d{2}-\d{2}/);
+  await expect(page.getByRole('heading', { name: /Willkommen/ })).toBeVisible();
 });
