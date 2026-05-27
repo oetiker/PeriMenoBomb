@@ -33,5 +33,8 @@
   "engines": {
     "pnpm": ">=9",
     "node": ">=20"
+  },
+  "dependencies": {
+    "dexie": "^4.4.2"
   }
 }
