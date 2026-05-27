@@ -1,0 +1,8 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "app_title": "PeriMenoBomb",
+  "nav_today": "Tag",
+  "nav_history": "Verlauf",
+  "nav_symptoms": "Symptome",
+  "nav_more": "Mehr"
+}

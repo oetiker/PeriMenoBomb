@@ -16,6 +16,9 @@ build/
 dist/
 dev-dist/
 
+# Paraglide generated output
+src/lib/paraglide/
+
 # Env
 .env
 .env.*
