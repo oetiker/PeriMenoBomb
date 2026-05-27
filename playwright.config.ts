@@ -4,12 +4,12 @@ export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 30_000,
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:5191',
     trace: 'retain-on-failure'
   },
   webServer: {
     command: 'pnpm run dev',
-    url: 'http://localhost:5173',
+    url: 'http://localhost:5191',
     reuseExistingServer: !process.env.CI,
     timeout: 60_000
   },
