@@ -83,6 +83,7 @@ Datenbank-Name: `perimenobomb`. Schema-Versionierung über Dexie's `db.version(n
   id:         string   // UUID v4
   name:       string
   color:      string   // CSS-Farbe aus Palette oder Custom-Hex
+  icon:       string   // Lucide-Icon-Name (z.B. 'flame', 'moon', 'heart-pulse'); Default 'circle' für Symptome, 'folder' für Ordner
   tagIds:     string[] // Referenzen auf tags.id
   parentId:   string | null  // null = Wurzel
   sortIndex:  number   // Sortierung innerhalb des Geschwister-Sets
@@ -211,7 +212,7 @@ Schreib-Ops: Komponente ruft eine Action (z.B. `addEntry`), die ein DB-Modul auf
 **Layout (von oben nach unten):**
 
 1. **Datums-Header:** „Tag" (Label) + Pfeil-links / Datum mit Tagesname / Pfeil-rechts. Tap auf Datum öffnet nativen Datums-Picker.
-2. **Heute-erfasst-Liste:** Karten-Stil, je Karte: Symptom-Farb-Dot, Symptom-Name, kompakte Status-Zeile (Intensität, ggf. 💬 wenn Kommentar). Tap = Konfig-Modal öffnen.
+2. **Heute-erfasst-Liste:** Karten-Stil, je Karte: Symptom-Badge (Icon im farbigen Kreis — siehe 6.2), Symptom-Name, kompakte Status-Zeile (Intensität, ggf. 💬 wenn Kommentar). Tap = Konfig-Modal öffnen.
 3. **Empty-State:** Wenn Liste leer: hilfreicher Text „Tippe das + unten, um Symptome zu erfassen."
 4. **FAB „+" unten rechts.**
 5. **Bottom-Nav.**
@@ -219,7 +220,7 @@ Schreib-Ops: Komponente ruft eine Action (z.B. `addEntry`), die ein DB-Modul auf
 **FAB-Tap → Symptom-Sheet:**
 
 - Slide-up-Sheet (~75% Bildschirmhöhe), Handle oben, Header „Symptom auswählen" + Schliessen-X.
-- Inhalt: Hierarchie-Ebene 1. Ordner und Symptome gemischt darstellbar (Ordner mit 📁-Icon und Chevron, Symptome mit Farb-Dot und +-Icon).
+- Inhalt: Hierarchie-Ebene 1. Ordner und Symptome gemischt darstellbar — alle mit Badge (Icon im farbigen Kreis); Ordner zeigen zusätzlich ein Chevron rechts (führt in die nächste Ebene), Symptome ein +-Icon rechts (erfasst direkt).
 - Tap auf Ordner: in-place-Navigation zur nächsten Ebene; Breadcrumb-Header (z.B. „‹ Zurück | Körperlich | ✕"), max 3 Ebenen Tiefe.
 - Tap auf Symptom:
   - Erzeugt sofort einen Eintrag in `entries` (intensity=null, comment="").
@@ -229,7 +230,7 @@ Schreib-Ops: Komponente ruft eine Action (z.B. `addEntry`), die ein DB-Modul auf
 
 **Konfig-Modal:**
 
-- Header: Symptom-Farb-Dot + Name + (klein darunter) breadcrumb-artiger Pfad.
+- Header: Symptom-Badge (36×36 px) + Name + (klein darunter) breadcrumb-artiger Pfad.
 - Intensität: vier Buttons „— ohne | Leicht | Mittel | Stark", einer aktiv. Default beim Neuanlegen: „— ohne".
 - Kommentar: Textarea (optional).
 - Primärer Button „Fertig" speichert und schliesst.
@@ -247,19 +248,33 @@ Schreib-Ops: Komponente ruft eine Action (z.B. `addEntry`), die ein DB-Modul auf
 
 **Standard-Modus:**
 
-- Hierarchische Liste mit Einrückung. Ordner mit Chevron (expandierbar), Symptome mit Farb-Dot. Sortiert nach `sortIndex` pro Ebene.
+- Hierarchische Liste mit Einrückung. Alle Einträge mit Badge (Icon im farbigen Kreis); Ordner zusätzlich mit Chevron (expandierbar). Sortiert nach `sortIndex` pro Ebene.
 - Header rechts: „Umsortieren"-Toggle, „+" (neues Symptom oder Ordner).
 - Tap auf einen Symptom-/Ordner-Knoten → Edit-Modal.
 
 **Edit-Modal:**
 
-- Felder: Name, Typ (Symptom / Ordner; Wechsel nur möglich wenn keine Tages-Einträge existieren), Farbe (Palette + „Mehr…"-Color-Picker, nur für Symptome), Tag-Auswahl (Multi-Select-Chips, nur für Symptome), Eltern-Ordner (Picker mit Hierarchie-Auswahl, validiert auf `depth ≤ 2`).
+- Felder: Name, Typ (Symptom / Ordner; Wechsel nur möglich wenn keine Tages-Einträge existieren), **Icon** (Picker — siehe unten), Farbe (Palette + „Mehr…"-Color-Picker), Tag-Auswahl (Multi-Select-Chips, nur für Symptome), Eltern-Ordner (Picker mit Hierarchie-Auswahl, validiert auf `depth ≤ 2`).
 - „Speichern" / „Löschen" (mit Confirm, plus Hinweis bei bestehenden Einträgen → Soft-Delete bzw. Archivieren) / „Abbrechen".
 
 **Reorder-Modus:**
 
 - Items zeigen Drag-Handles. Drag verschiebt innerhalb der Ebene; Drag auf Ordner-Icon = Verschieben hinein.
 - „Fertig"-Button oben rechts schliesst den Modus, speichert neue `sortIndex`/`parentId`.
+
+**Icon-Picker:**
+
+- Modal mit Suchfeld oben. Resultate als responsives Grid (z.B. 6 Spalten auf Mobile).
+- **Sektion „Vorschläge"** oben (kuratierte Auswahl von ca. 30 körper-/gefühls-relevanten Lucide-Icons: `flame`, `moon`, `heart-pulse`, `brain`, `wind`, `cloud-drizzle`, `zap`, `droplet`, `thermometer`, `pill`, `bed`, `activity`, `frown`, `smile`, `meh`, `alert-triangle`, `sun`, `coffee`, `eye`, …).
+- **Sektion „Alle"** darunter — vollständiger Lucide-Satz, filterbar.
+- Live-Vorschau: aktuell ausgewähltes Icon im Badge-Stil mit aktueller Symptom-Farbe.
+- Ausgewählt wird der Icon-Name (String), nicht der gerenderte SVG. Rendering geschieht überall via `lucide-svelte`-Komponente mit dem Namen als Prop.
+
+**Badge-Rendering (überall in der App, wo ein Symptom/Ordner erscheint):**
+
+- Runder Kreis, gefüllt mit der Symptom-/Ordner-Farbe, Icon weiss zentriert.
+- Standardgrösse: 28×28 px in Listen, 36×36 px im Modal-Header, 20×20 px in kompakten Kontexten (Filter-Chips o.ä.).
+- Bei archivierten Symptomen: 50% Opazität.
 
 **Farb-Palette** (12 Farben, verbindlich für visuelle Konsistenz mit späterer Heatmap):
 
