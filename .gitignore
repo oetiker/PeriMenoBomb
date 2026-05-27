@@ -1,0 +1,34 @@
+# Brainstorming companion artefacts
+.superpowers/
+
+# Node
+node_modules/
+.pnpm-store/
+pnpm-debug.log*
+
+# SvelteKit
+.svelte-kit/
+build/
+.vercel/
+.netlify/
+
+# Vite / PWA
+dist/
+dev-dist/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+coverage/
+playwright-report/
+test-results/
