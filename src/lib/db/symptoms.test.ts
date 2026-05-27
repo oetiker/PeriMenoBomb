@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDatabase, db } from './index';
 import { createSymptom, updateSymptom, getSymptom, archiveSymptom, listAllSymptoms, listChildren } from './symptoms';
+import { moveSymptom, reorderSiblings, subtreeDepth, listTree } from './symptoms';
 
 describe('symptoms CRUD', () => {
   beforeEach(() => resetDatabase());
@@ -65,5 +66,59 @@ describe('symptoms CRUD', () => {
     await db.symptoms.update(b.id, { sortIndex: 1 });
     const kids = await listChildren(root.id);
     expect(kids.map((k) => k.name)).toEqual(['A', 'B']);
+  });
+});
+
+describe('symptoms hierarchy', () => {
+  beforeEach(() => resetDatabase());
+
+  it('moveSymptom changes parent and recomputes depth', async () => {
+    const r1 = await createSymptom({ name: 'R1', isFolder: true });
+    const r2 = await createSymptom({ name: 'R2', isFolder: true });
+    const child = await createSymptom({ name: 'C', parentId: r1.id });
+    await moveSymptom(child.id, r2.id);
+    const after = await getSymptom(child.id);
+    expect(after?.parentId).toBe(r2.id);
+    expect(after?.depth).toBe(1);
+  });
+
+  it('moveSymptom rejects move that would exceed MAX_DEPTH', async () => {
+    const a = await createSymptom({ name: 'A', isFolder: true });
+    const b = await createSymptom({ name: 'B', isFolder: true, parentId: a.id });
+    const c = await createSymptom({ name: 'C', parentId: b.id });
+    const d = await createSymptom({ name: 'D', isFolder: true });
+    await expect(moveSymptom(a.id, d.id)).rejects.toThrow(/depth/i);
+    void c;
+  });
+
+  it('moveSymptom rejects moving a node into its own subtree (cycle)', async () => {
+    const a = await createSymptom({ name: 'A', isFolder: true });
+    const b = await createSymptom({ name: 'B', isFolder: true, parentId: a.id });
+    await expect(moveSymptom(a.id, b.id)).rejects.toThrow(/cycle/i);
+  });
+
+  it('reorderSiblings updates sortIndex for the given order', async () => {
+    const r = await createSymptom({ name: 'R', isFolder: true });
+    const x = await createSymptom({ name: 'X', parentId: r.id });
+    const y = await createSymptom({ name: 'Y', parentId: r.id });
+    const z = await createSymptom({ name: 'Z', parentId: r.id });
+    await reorderSiblings(r.id, [z.id, x.id, y.id]);
+    const kids = await listChildren(r.id);
+    expect(kids.map((k) => k.name)).toEqual(['Z', 'X', 'Y']);
+  });
+
+  it('subtreeDepth returns max depth diff under a node', async () => {
+    const a = await createSymptom({ name: 'A', isFolder: true });
+    const b = await createSymptom({ name: 'B', isFolder: true, parentId: a.id });
+    await createSymptom({ name: 'C', parentId: b.id });
+    expect(await subtreeDepth(a.id)).toBe(2);
+  });
+
+  it('listTree returns roots and children sorted', async () => {
+    const r = await createSymptom({ name: 'R', isFolder: true });
+    await createSymptom({ name: 'Child', parentId: r.id });
+    const tree = await listTree();
+    expect(tree[0].name).toBe('R');
+    expect(tree[0].children[0].name).toBe('Child');
   });
 });
