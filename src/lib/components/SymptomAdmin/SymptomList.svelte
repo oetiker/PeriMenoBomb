@@ -2,8 +2,9 @@
   import Badge from '$lib/components/ui/Badge.svelte';
   import SymptomEditModal from './SymptomEditModal.svelte';
   import { ChevronDown, ChevronRight, Plus } from '@lucide/svelte';
-  import { listTree, createSymptom, type TreeNode } from '$lib/db/symptoms';
+  import { listTree, createSymptom, reorderSiblings, type TreeNode } from '$lib/db/symptoms';
   import { liveQuery } from '$lib/stores/liveQuery.svelte';
+  import { dndzone, type DndEvent } from 'svelte-dnd-action';
   import type { Symptom } from '$lib/db';
 
   const treeQ = liveQuery(() => listTree(), [] as TreeNode[]);
@@ -11,6 +12,7 @@
 
   let expanded = $state(new Set<string>());
   let editing = $state<Symptom | null>(null);
+  let reorderMode = $state(false);
 
   function toggle(id: string) {
     if (expanded.has(id)) expanded.delete(id);
@@ -23,6 +25,15 @@
     if (!name) return;
     await createSymptom({ name, isFolder });
   }
+
+  function handleConsider(_parentId: string | null, _e: CustomEvent<DndEvent<TreeNode>>) {
+    // Optimistic UI: dnd-action drives its own internal state during drag.
+    // We persist only on finalize. Visual feedback during drag is best-effort in MVP.
+  }
+
+  async function handleFinalize(parentId: string | null, e: CustomEvent<DndEvent<TreeNode>>) {
+    await reorderSiblings(parentId, e.detail.items.map((i) => i.id));
+  }
 </script>
 
 <header class="bar">
@@ -30,6 +41,9 @@
   <div class="actions">
     <button type="button" onclick={() => addRoot(false)}><Plus size={16} /> Symptom</button>
     <button type="button" onclick={() => addRoot(true)}><Plus size={16} /> Ordner</button>
+    <button type="button" onclick={() => reorderMode = !reorderMode}>
+      {reorderMode ? 'Fertig' : 'Umsortieren'}
+    </button>
   </div>
 </header>
 
@@ -52,8 +66,13 @@
   {/if}
 {/snippet}
 
-<ul class="list">
-  {#each treeQ.current as n}{@render renderNode(n, 0)}{/each}
+<ul
+  class="list"
+  use:dndzone={{ items: treeQ.current, flipDurationMs: 0, dragDisabled: !reorderMode, type: 'roots' }}
+  onconsider={(e) => handleConsider(null, e as CustomEvent<DndEvent<TreeNode>>)}
+  onfinalize={(e) => handleFinalize(null, e as CustomEvent<DndEvent<TreeNode>>)}
+>
+  {#each treeQ.current as n (n.id)}{@render renderNode(n, 0)}{/each}
   {#if treeQ.current.length === 0}<li class="empty">Noch keine Symptome.</li>{/if}
 </ul>
 
