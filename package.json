@@ -38,6 +38,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "dexie": "^4.4.2"
+    "dexie": "^4.4.2",
+    "lucide-svelte": "^1.0.1"
   }
 }

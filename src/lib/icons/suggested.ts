@@ -1,0 +1,35 @@
+export const SUGGESTED_ICONS: string[] = [
+  'flame',
+  'thermometer',
+  'wind',
+  'cloud-drizzle',
+  'droplet',
+  'heart-pulse',
+  'heart',
+  'brain',
+  'pill',
+  'bandage',
+  'bed',
+  'moon',
+  'sun',
+  'cloud',
+  'cloud-rain',
+  'zap',
+  'activity',
+  'eye',
+  'ear',
+  'smile',
+  'meh',
+  'frown',
+  'angry',
+  'cloud-fog',
+  'sparkles',
+  'alert-triangle',
+  'feather',
+  'leaf',
+  'coffee',
+  'utensils'
+];
+
+export const DEFAULT_SYMPTOM_ICON = 'circle';
+export const DEFAULT_FOLDER_ICON = 'folder';
