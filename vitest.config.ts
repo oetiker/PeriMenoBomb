@@ -8,5 +8,8 @@ export default defineConfig({
     setupFiles: ['src/lib/test/setup.ts'],
     include: ['src/**/*.test.ts'],
     globals: true
+  },
+  resolve: {
+    conditions: ['browser']
   }
 });
