@@ -1,7 +1,7 @@
 <script lang="ts">
   import Badge from '$lib/components/ui/Badge.svelte';
   import SymptomEditModal from './SymptomEditModal.svelte';
-  import { ChevronDown, ChevronRight, Plus } from '@lucide/svelte';
+  import { ChevronDown, ChevronRight, Plus, FolderPlus, ArrowUpDown, Check } from '@lucide/svelte';
   import {
     listTree,
     reorderSiblings,
@@ -63,10 +63,28 @@
 <header class="bar">
   <h1>Symptome</h1>
   <div class="actions">
-    <button type="button" onclick={() => startAdd(false)}><Plus size={16} /> Symptom</button>
-    <button type="button" onclick={() => startAdd(true)}><Plus size={16} /> Ordner</button>
-    <button type="button" onclick={() => reorderMode = !reorderMode}>
-      {reorderMode ? 'Fertig' : 'Umsortieren'}
+    <button
+      type="button"
+      class="icon-btn"
+      onclick={() => startAdd(false)}
+      aria-label="Neues Symptom"
+      title="Neues Symptom"
+    ><Plus size={20} /></button>
+    <button
+      type="button"
+      class="icon-btn"
+      onclick={() => startAdd(true)}
+      aria-label="Neuer Ordner"
+      title="Neuer Ordner"
+    ><FolderPlus size={20} /></button>
+    <button
+      type="button"
+      class="icon-btn {reorderMode ? 'active' : ''}"
+      onclick={() => reorderMode = !reorderMode}
+      aria-label={reorderMode ? 'Sortier-Modus beenden' : 'Umsortieren'}
+      title={reorderMode ? 'Fertig' : 'Umsortieren'}
+    >
+      {#if reorderMode}<Check size={20} />{:else}<ArrowUpDown size={20} />{/if}
     </button>
   </div>
 </header>
@@ -110,10 +128,19 @@
 {/if}
 
 <style>
-  .bar { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-4); border-bottom: 1px solid var(--c-border); }
-  .bar h1 { margin: 0; font-size: var(--fs-lg); }
-  .actions { display: flex; gap: var(--sp-2); }
-  .actions button { display: inline-flex; align-items: center; gap: 4px; padding: var(--sp-2) var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--r-2); background: var(--c-surface); cursor: pointer; }
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); padding: var(--sp-4); border-bottom: 1px solid var(--c-border); }
+  .bar h1 { margin: 0; font-size: var(--fs-lg); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .actions { display: flex; gap: var(--sp-1); flex-shrink: 0; }
+  .icon-btn {
+    width: 40px; height: 40px;
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0;
+    border: 1px solid var(--c-border); border-radius: var(--r-2);
+    background: var(--c-surface);
+    color: var(--c-text);
+    cursor: pointer;
+  }
+  .icon-btn.active { background: var(--c-primary); color: var(--c-primary-contrast); border-color: var(--c-primary); }
   .list { list-style: none; margin: 0; padding: 0; }
   .row { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2); border-bottom: 1px solid var(--c-border); }
   .chev, .chev-spacer { width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; background: none; border: 0; color: var(--c-text-dim); cursor: pointer; }
