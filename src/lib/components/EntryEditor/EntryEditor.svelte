@@ -38,11 +38,15 @@
     const v = (e.target as HTMLInputElement).value;
     if (!v || !isValidDateKey(v) || v === workingDate) return;
     const oldDate = workingDate;
+    // Hoist captured values so the undo closure can reference them.
+    let carrySlider: number | null = null;
+    let carryNumber: number | null = null;
+    let carryComment = comment;
     await db.transaction('rw', db.entries, async () => {
       const existing = await getEntry(oldDate, symptom.id);
-      const carrySlider = existing?.sliderValue ?? null;
-      const carryNumber = existing?.numberValue ?? null;
-      const carryComment = existing?.comment ?? comment;
+      carrySlider = existing?.sliderValue ?? null;
+      carryNumber = existing?.numberValue ?? null;
+      carryComment = existing?.comment ?? comment;
       await deleteEntry(oldDate, symptom.id);
       await upsertEntry({
         date: v,
@@ -59,7 +63,9 @@
       onAction: async () => {
         await db.transaction('rw', db.entries, async () => {
           await deleteEntry(v, symptom.id);
-          await upsertEntry({ date: oldDate, symptomId: symptom.id, sliderValue: null, numberValue: null, comment });
+          // Use the captured original values to avoid data loss on undo
+          // (Task 11 will rewrite the entire date-move flow).
+          await upsertEntry({ date: oldDate, symptomId: symptom.id, sliderValue: carrySlider, numberValue: carryNumber, comment: carryComment });
         });
         workingDate = oldDate;
       }

@@ -7,7 +7,8 @@
   type Props = { entry: Entry; symptom: Symptom; onTap: () => void; onSwipe: () => void };
   let { entry, symptom, onTap, onSwipe }: Props = $props();
 
-  const intensityLabel = $derived(
+  // Transient stub — Task 13 replaces the status line with the new slider/number/comment-aware version.
+  const valueLabel = $derived(
     entry.sliderValue !== null ? String(entry.sliderValue) : 'erfasst'
   );
 </script>
@@ -18,7 +19,7 @@
     <div class="text">
       <div class="name">{symptom.name}</div>
       <div class="meta">
-        <span class={`level level-${entry.sliderValue ?? 'none'}`}>{intensityLabel}</span>
+        <span class={`level level-${entry.sliderValue ?? 'none'}`}>{valueLabel}</span>
         {#if entry.comment}<MessageCircle size={14} />{/if}
       </div>
     </div>
@@ -38,5 +39,4 @@
   .text { flex: 1; }
   .name { font-weight: var(--fw-bold); }
   .meta { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--c-text-dim); margin-top: 2px; }
-  .level-stark { color: var(--c-danger); font-weight: var(--fw-bold); }
 </style>

@@ -9,17 +9,15 @@ import { upsertEntry, getEntry } from '$lib/db/entries';
 describe('EntryEditor', () => {
   beforeEach(() => resetDatabase());
 
-  it('updates the entry on interaction', async () => {
+  // Tests rewritten in Task 11 against the new editor — see plan.
+  it('renders the comment textarea when open', async () => {
     const sym = await createSymptom({ name: 'Hitzewallungen' });
     await upsertEntry({ date: '2026-05-27', symptomId: sym.id });
-    const { getByText } = render(EntryEditor, {
+    render(EntryEditor, {
       props: { open: true, date: '2026-05-27', symptom: sym, onClose: () => {} }
     });
-    // Intensity UI is removed in this stub; Task 11 rewrites this test.
     await tick();
-    await new Promise((r) => setTimeout(r, 30));
-    const after = await getEntry('2026-05-27', sym.id);
-    expect(after?.sliderValue).toBeNull();
+    expect(document.querySelector('textarea')).toBeTruthy();
   });
 
   it('delete removes the entry and closes', async () => {
