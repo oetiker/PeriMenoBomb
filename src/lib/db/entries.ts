@@ -1,4 +1,4 @@
-import { db, type Entry, entryKey } from './index';
+import { db, type Entry, type Symptom, entryKey } from './index';
 import { isValidDateKey } from '$lib/utils/date';
 
 export interface UpsertEntryInput {
@@ -47,8 +47,6 @@ export async function listEntriesForDate(date: string): Promise<Entry[]> {
 export async function listEntriesForRange(fromDate: string, toDate: string): Promise<Entry[]> {
   return db.entries.where('date').between(fromDate, toDate, true, true).toArray();
 }
-
-import type { Symptom } from './index';
 
 export type EntryValidationField = 'slider' | 'number' | 'comment';
 
