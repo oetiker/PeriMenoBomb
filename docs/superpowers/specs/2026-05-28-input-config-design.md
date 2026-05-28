@@ -20,6 +20,8 @@ Jeder Baustein lässt sich pro Symptom unabhängig **aktivieren** und **als Pfli
 
 Zusätzlich kommt eine **Persistenz für offene Dialoge**: schließt die Nutzerin die App mit offenem Editor, kehrt sie beim nächsten Start mit allen Eingaben in den gleichen Dialog zurück.
 
+Ein neuer **Daily-Flag** pro Symptom erzeugt eine graue „noch offen"-Erinnerungs-Karte oben in der Tagesliste, solange für den angezeigten Tag kein Eintrag existiert — unverbindlich, nur zur Selbsterinnerung.
+
 **Backward-Compat:** keine. Die App ist nicht deployed; bestehende Einträge werden beim Schema-Upgrade verworfen.
 
 ---
@@ -65,12 +67,16 @@ interface Symptom {
 
   // NEU
   inputs: SymptomInputs;
+  daily:  boolean;        // Default: false; zeigt eine graue „noch offen"-Prompt-Karte
+                          // in der Tagesliste, solange kein Eintrag für den Tag existiert
 }
 ```
 
-**Defaults für neu angelegte Symptome:** alle drei Inputs `enabled=false`, `required=false`, alle String-Felder leer, `integer=true`.
+**Defaults für neu angelegte Symptome:** alle drei Inputs `enabled=false`, `required=false`, alle String-Felder leer, `integer=true`, `daily=false`.
 
-**Folders:** `inputs` ist auch auf Ordnern vorhanden, hat aber keine Wirkung — Ordner haben weiterhin keine Einträge.
+**Folders:** `inputs` und `daily` sind auch auf Ordnern vorhanden, haben aber keine Wirkung — Ordner haben weiterhin keine Einträge und erscheinen nie als Daily-Prompt.
+
+**Daily-Sichtbarkeit:** Eine Daily-Prompt-Karte erscheint nur, wenn `daily=true` UND mindestens einer der drei Inputs `enabled=true` ist. Symptome mit `daily=true` aber komplett deaktivierten Inputs ergeben keine Prompts (es gibt nichts zu erfassen) — das Datenfeld wird respektiert, aber nicht gerendert.
 
 ### 2.2 Entry
 
@@ -151,9 +157,10 @@ this.version(2).stores({
 }).upgrade(async (tx) => {
   // 1. Alle bestehenden Einträge verwerfen — neues Schema, keine sinnvolle Migration.
   await tx.table('entries').clear();
-  // 2. Symptome ohne `inputs`-Block mit Default-Block versehen.
+  // 2. Symptome ohne `inputs`-Block und ohne `daily`-Flag mit Defaults versehen.
   await tx.table('symptoms').toCollection().modify((s) => {
     if (!s.inputs) s.inputs = defaultSymptomInputs();
+    if (typeof s.daily !== 'boolean') s.daily = false;
   });
   // 3. Falls `meta.openDialog` aus einer Test-Session existiert: löschen.
   await tx.table('meta').delete('openDialog');
@@ -257,28 +264,52 @@ Drei „Input-Karten" untereinander, je eine pro Baustein (Slider, Zahl, Komment
 
 - Leer. (Nichts zu konfigurieren außer aktiv/pflicht.)
 
-### 4.6 Validierung beim Speichern
+### 4.6 Daily-Toggle
 
-- Es ist explizit erlaubt, ein Symptom mit allen drei Inputs inaktiv zu speichern.
+Unterhalb der drei Input-Karten, **nur sichtbar** wenn mindestens einer der drei Inputs `enabled=true` ist:
+
+- **Checkbox „Täglich erfassen"**, gebunden an `Symptom.daily`.
+- Hilfstext: „Erscheint jeden Tag als graue Erinnerungs-Karte oben in der Liste, bis ein Eintrag erfasst ist."
+
+Wenn die Nutzerin alle Inputs deaktiviert, verschwindet der Toggle aus dem UI; der gespeicherte `daily`-Wert bleibt aber unverändert (taucht beim erneuten Aktivieren wieder auf).
+
+### 4.7 Validierung beim Speichern
+
+- Es ist explizit erlaubt, ein Symptom mit allen drei Inputs inaktiv zu speichern (`daily` ist dann irrelevant — siehe § 2.1).
 - Es ist explizit erlaubt, einen aktiven Slider/Zahl ohne `lowLabel`/`highLabel`/`unit` zu speichern. Im Editor erscheinen dann nur Placeholder.
 
 ---
 
 ## 5. UX — Tagesliste
 
-Die Tagesliste zeigt **ausschließlich** Einträge aus der `entries`-Tabelle. Da es keine Drafts gibt, gibt es keine „Entwurf"-Markierung in der Liste.
+Die Tagesliste hat zwei Sektionen (in dieser Reihenfolge):
 
-Pro Karte:
+### 5.1 Sektion „Noch offen" — Daily-Prompts
 
-- Badge + Symptomname.
-- **Status-Zeile:** Zusammenfassung der vorhandenen Werte, in der Reihenfolge Slider → Zahl → Kommentar:
-  - Slider: `lowLabel/highLabel`-Mini-Visualisierung mit Position; bei `null` → „unspezifisch".
-  - Zahl: `numberValue + ' ' + unit` (Einheit weggelassen wenn leer).
-  - Kommentar: 💬-Icon wenn `comment.trim().length > 0`.
+- Section-Header **„Noch offen"** (datums-unabhängiger Text; gilt sowohl für heute als auch retrospektiv und prospektiv).
+- Inhalt: pro nicht-archiviertes Symptom mit `daily=true` UND mindestens einem aktiven Input UND **ohne** Entry für das angezeigte Datum eine **graue Prompt-Karte**:
+  - Badge ausgegraut (z.B. 50 % Opazität wie bei archivierten Items).
+  - Symptomname in Text-Dim-Farbe.
+  - Status-Zeile: „noch nicht erfasst".
+- Sortierung: stable Symptom-Tree-Reihenfolge (rekursiv depth-first, dieselbe wie in der Symptom-Admin-Liste).
+- Tap auf eine Prompt-Karte: öffnet den `EntryEditor` für `(angezeigtes Datum, symptomId)` — derselbe Flow wie beim Pick aus dem Symptom-Sheet.
+- Wird die Sektion leer (keine offenen Daily-Symptome), wird der ganze Header weggelassen.
 
-Inaktive Inputs des Symptoms werden in der Karte weggelassen.
+### 5.2 Sektion „Erfasst"
 
-Swipe nach links: bestehendes Verhalten (Eintrag entfernen + Undo-Snackbar).
+- Section-Header datums-abhängig:
+  - Wenn das angezeigte Datum `todayKey()` ist → **„Heute erfasst (N)"**.
+  - Sonst → **„Erfasst (N)"** (kein „Heute" für andere Tage — Bugfix gegenüber aktuellem Code in `EntryList.svelte:31`).
+- Inhalt: alle Entries aus `entries` für das angezeigte Datum, in Insertion-Order (`updatedAt` aufsteigend) — wie heute.
+- Pro Karte:
+  - Badge + Symptomname.
+  - **Status-Zeile:** Zusammenfassung der vorhandenen Werte, in der Reihenfolge Slider → Zahl → Kommentar:
+    - Slider: `lowLabel/highLabel`-Mini-Visualisierung mit Position; bei `null` → „unspezifisch".
+    - Zahl: `numberValue + ' ' + unit` (Einheit weggelassen wenn leer).
+    - Kommentar: 💬-Icon wenn `comment.trim().length > 0`.
+  - Inaktive Inputs des Symptoms werden in der Karte weggelassen.
+- Swipe nach links: bestehendes Verhalten (Eintrag entfernen + Undo-Snackbar). Nach dem Entfernen erscheint der Eintrag — falls er zu einem Daily-Symptom gehört — automatisch wieder als Prompt in Sektion 5.1.
+- Empty-State: wenn beide Sektionen leer sind (keine Einträge UND keine offenen Daily-Prompts), Text „Tippe das + unten, um Symptome zu erfassen." Ansonsten kein eigener Empty-State pro Sektion (leere Sektionen werden komplett ausgeblendet).
 
 ---
 
@@ -336,19 +367,21 @@ Ordner-Items bekommen leere Default-Inputs (irrelevant, da Ordner keine Einträg
 
 - `src/lib/components/EntryEditor/SliderInput.svelte` — Custom-Slider mit unspez-Slot.
 - `src/lib/components/EntryEditor/NumberInput.svelte` — Kompaktes Zahlenfeld + Einheit-Label.
-- `src/lib/components/SymptomAdmin/InputConfigSection.svelte` — Die drei Input-Karten im Symptom-Edit-Modal.
+- `src/lib/components/SymptomAdmin/InputConfigSection.svelte` — Die drei Input-Karten + Daily-Toggle im Symptom-Edit-Modal.
+- `src/lib/components/DayView/DailyPromptCard.svelte` — graue Prompt-Karte für offene Daily-Symptome in Sektion 5.1.
 - `src/lib/stores/openDialog.svelte.ts` — Persistenz-Helfer (`persistDialog` / `updateDialogPayload` / `clearDialog` / `pendingRestore`).
 
 ### 8.2 Geändert
 
-- `src/lib/db/index.ts` — Typen `Symptom`, `Entry`; Schema-Version 2; `Intensity`-Typ entfernt.
-- `src/lib/db/symptoms.ts` — `createSymptom` setzt `defaultSymptomInputs()`.
+- `src/lib/db/index.ts` — Typen `Symptom` (+ `daily`, + `inputs`), `Entry`; Schema-Version 2; `Intensity`-Typ entfernt.
+- `src/lib/db/symptoms.ts` — `createSymptom` setzt `defaultSymptomInputs()` und `daily=false`. Neue Query `listDailySymptomsForDate(date)` liefert nicht-archivierte Symptome mit `daily=true && hasEnabledInput(inputs)`, sortiert nach Symptom-Tree-Reihenfolge.
 - `src/lib/db/entries.ts` — `UpsertEntryInput` arbeitet auf den neuen Feldern. Neue Hilfsfunktion `validateEntry(symptom, entry): { ok: boolean, missing: ('slider' | 'number' | 'comment')[] }` prüft Pflicht-Felder und gibt fehlende Bausteine zurück (vom Editor für Disabled-State + Shake-Animation konsumiert).
 - `src/lib/components/EntryEditor/EntryEditor.svelte` — komplett umgebaut auf die neuen Inputs + `persistDialog`.
 - `src/lib/components/SymptomAdmin/SymptomEditModal.svelte` — `InputConfigSection` eingebettet, `persistDialog`-Calls.
+- `src/lib/components/DayView/EntryList.svelte` — Zwei-Sektionen-Layout (5.1 „Noch offen" / 5.2 „Erfasst" bzw. „Heute erfasst"), datums-abhängige Header, Daily-Prompt-Rendering. Bugfix: „Heute"-Wording nur wenn `date === todayKey()`.
 - `src/lib/components/DayView/EntryCard.svelte` — Status-Zeile mit Slider/Zahl/Kommentar statt Intensity.
 - `src/routes/+layout.svelte` — beim Mount: Restore-Logik.
-- `src/lib/templates/perimeno-default.ts` — neue Input-Konfig pro Symptom.
+- `src/lib/templates/perimeno-default.ts` — neue Input-Konfig pro Symptom; ausgewählte Symptome (z.B. Stimmung, Schlafqualität) bekommen `daily=true`.
 
 ### 8.3 Entfernt
 
@@ -359,20 +392,23 @@ Ordner-Items bekommen leere Default-Inputs (irrelevant, da Ordner keine Einträg
 ## 9. Tests
 
 - **Unit (Vitest):**
-  - `db/symptoms.ts`: `createSymptom` legt Default-`inputs` an.
+  - `db/symptoms.ts`: `createSymptom` legt Default-`inputs` und `daily=false` an. `listDailySymptomsForDate` filtert archivierte und input-lose Symptome korrekt heraus.
   - `db/entries.ts`: `validateEntry` korrekt für alle Pflicht-Kombinationen.
   - `stores/openDialog.svelte.ts`: Persistenz-Roundtrip via fake-indexeddb.
-  - Migrations-Test: Symptom ohne `inputs` bekommt Default-Block; alte `entries`-Rows werden gelöscht.
+  - Migrations-Test: Symptom ohne `inputs`/`daily` bekommt Defaults; alte `entries`-Rows werden gelöscht.
 
 - **Komponenten (Vitest + @testing-library/svelte):**
   - `SliderInput`: Snap-Verhalten an der Gap; null-Initial; required-Flag deaktiviert „Fertig".
   - `NumberInput`: integer vs. decimal; leeres Feld = null.
-  - `InputConfigSection`: Toggles + bedingte Bodies.
+  - `InputConfigSection`: Toggles + bedingte Bodies; Daily-Toggle nur sichtbar wenn ≥1 Input aktiv.
+  - `DailyPromptCard`: graue Darstellung, Tap löst Editor-Open-Callback aus.
+  - `EntryList`: Section-Header datums-abhängig („Heute erfasst" vs. „Erfasst"); Sektion „Noch offen" erscheint nur, wenn offene Daily-Symptome existieren.
 
 - **E2E (Playwright):**
   - Happy-Path neu: Tap → Slider rüberziehen → Zahl eintippen → Fertig → Karte zeigt Werte.
   - Pflicht-Negativ: Slider Pflicht, ohne Bewegung → Fertig deaktiviert, Shake bei Klick.
   - Restore-Roundtrip: Editor öffnen, Werte eintippen, Seite neu laden → Editor öffnet sich mit gleichen Werten.
+  - Daily-Flow: Symptom als Daily markieren → Prompt erscheint heute → Tap auf Prompt → Editor → Fertig → Prompt verschwindet, Karte im Erfasst-Block; Swipe-Löschen → Prompt erscheint wieder.
 
 ---
 
@@ -403,8 +439,9 @@ Backdrop-Tap löscht Eingaben unwiderruflich (keine Confirm-Stufe). Begründung:
 3. `openDialog`-Store + Restore-Logik in `+layout.svelte`.
 4. `SliderInput` (mit Snap + Hysterese).
 5. `NumberInput`.
-6. `InputConfigSection` im Symptom-Admin.
+6. `InputConfigSection` im Symptom-Admin (inkl. Daily-Toggle).
 7. `EntryEditor` neu zusammenbauen.
 8. `EntryCard`-Status-Zeile.
-9. Standard-Vorlage neu kuratieren.
-10. E2E-Happy-Path neu schreiben.
+9. `EntryList` mit Zwei-Sektionen-Layout, datums-abhängigem Header und `DailyPromptCard`.
+10. Standard-Vorlage neu kuratieren (inkl. `daily`-Markierungen für ausgewählte Symptome).
+11. E2E-Happy-Path neu schreiben (inkl. Daily-Flow).
