@@ -1,7 +1,7 @@
 <script lang="ts">
   import Badge from '$lib/components/ui/Badge.svelte';
   import SymptomEditModal from './SymptomEditModal.svelte';
-  import { ChevronDown, ChevronRight, Plus, FolderPlus, ArrowUpDown, Check } from '@lucide/svelte';
+  import { ChevronDown, ChevronRight, Plus, FolderPlus, GripVertical } from '@lucide/svelte';
   import {
     listTree,
     reorderSiblings,
@@ -19,7 +19,6 @@
 
   let expanded = $state(new Set<string>());
   let editing = $state<{ symptom: Symptom; isNew: boolean } | null>(null);
-  let reorderMode = $state(false);
 
   function toggle(id: string) {
     if (expanded.has(id)) expanded.delete(id);
@@ -77,31 +76,31 @@
       aria-label="Neuer Ordner"
       title="Neuer Ordner"
     ><FolderPlus size={20} /></button>
-    <button
-      type="button"
-      class="icon-btn {reorderMode ? 'active' : ''}"
-      onclick={() => reorderMode = !reorderMode}
-      aria-label={reorderMode ? 'Sortier-Modus beenden' : 'Umsortieren'}
-      title={reorderMode ? 'Fertig' : 'Umsortieren'}
-    >
-      {#if reorderMode}<Check size={20} />{:else}<ArrowUpDown size={20} />{/if}
-    </button>
   </div>
 </header>
 
 {#snippet renderNode(node: TreeNode, level: number)}
-  <li class="row" style="padding-left: calc({level} * var(--sp-4) + var(--sp-3))">
+  <li class="row" style="padding-left: calc({level} * var(--sp-4) + var(--sp-2))">
     {#if node.isFolder}
-      <button type="button" class="chev" onclick={() => toggle(node.id)} aria-label="Aufklappen">
-        {#if expanded.has(node.id)}<ChevronDown size={16} />{:else}<ChevronRight size={16} />{/if}
+      <button
+        type="button"
+        class="chev {expanded.has(node.id) ? 'open' : ''}"
+        onclick={() => toggle(node.id)}
+        aria-label={expanded.has(node.id) ? 'Zuklappen' : 'Aufklappen'}
+        aria-expanded={expanded.has(node.id)}
+      >
+        {#if expanded.has(node.id)}<ChevronDown size={22} />{:else}<ChevronRight size={22} />{/if}
       </button>
     {:else}
-      <span class="chev-spacer"></span>
+      <span class="chev-spacer" aria-hidden="true"></span>
     {/if}
     <button type="button" class="entry" onclick={() => startEdit(node)}>
       <Badge icon={node.icon} color={node.color} size={28} />
-      <span>{node.name}</span>
+      <span class="entry-name">{node.name}</span>
     </button>
+    <span class="drag-handle" aria-label="Ziehen zum Verschieben" title="Ziehen zum Verschieben">
+      <GripVertical size={20} />
+    </span>
   </li>
   {#if node.isFolder && expanded.has(node.id)}
     {#each node.children as c}{@render renderNode(c, level + 1)}{/each}
@@ -110,7 +109,7 @@
 
 <ul
   class="list"
-  use:dndzone={{ items: treeQ.current, flipDurationMs: 0, dragDisabled: !reorderMode, type: 'roots' }}
+  use:dndzone={{ items: treeQ.current, flipDurationMs: 120, type: 'roots' }}
   onconsider={(e) => handleConsider(null, e as CustomEvent<DndEvent<TreeNode>>)}
   onfinalize={(e) => handleFinalize(null, e as CustomEvent<DndEvent<TreeNode>>)}
 >
@@ -142,8 +141,41 @@
   }
   .icon-btn.active { background: var(--c-primary); color: var(--c-primary-contrast); border-color: var(--c-primary); }
   .list { list-style: none; margin: 0; padding: 0; }
-  .row { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2); border-bottom: 1px solid var(--c-border); }
-  .chev, .chev-spacer { width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; background: none; border: 0; color: var(--c-text-dim); cursor: pointer; }
-  .entry { display: flex; align-items: center; gap: var(--sp-3); background: none; border: 0; padding: var(--sp-2); cursor: pointer; flex: 1; text-align: left; }
+  .row {
+    display: flex; align-items: center; gap: 0;
+    padding: var(--sp-2);
+    border-bottom: 1px solid var(--c-border);
+    background: var(--c-surface);
+  }
+  .chev {
+    width: 28px; height: 28px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: none;
+    border: 0;
+    color: var(--c-text);
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0;
+    margin-right: var(--sp-1);
+  }
+  .chev-spacer { width: 28px; flex-shrink: 0; margin-right: var(--sp-1); }
+  .entry {
+    display: flex; align-items: center; gap: var(--sp-3);
+    background: none; border: 0; padding: var(--sp-2) 0;
+    cursor: pointer; flex: 1; text-align: left;
+    min-width: 0;
+  }
+  .entry-name {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .drag-handle {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    color: var(--c-text-dim);
+    cursor: grab;
+    flex-shrink: 0;
+    touch-action: none;
+  }
+  .drag-handle:active { cursor: grabbing; color: var(--c-text); }
   .empty { padding: var(--sp-5); text-align: center; color: var(--c-text-dim); }
 </style>
