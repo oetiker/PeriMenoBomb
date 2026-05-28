@@ -62,6 +62,14 @@
     window.removeEventListener('pointercancel', onPointerUp);
   }
 
+  $effect(() => {
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+    };
+  });
+
   // Render position for the thumb. Computed each render; on test environments
   // without layout we still expose the zone via data-attribute for assertions.
   const zone: Zone = $derived(value === null ? 'unspez' : 'continuous');
@@ -75,7 +83,8 @@
     if (value === null) return `left: ${UNSPEZ_PX / 2}px;`;
     const contStart = UNSPEZ_PX + GAP_PX;
     const trackWidth = rect.width - contStart;
-    const t = (value - 1) / 99;
+    const safeValue = Math.max(1, Math.min(100, value));
+    const t = (safeValue - 1) / 99;
     return `left: ${contStart + t * trackWidth}px;`;
   }
 </script>
