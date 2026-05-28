@@ -1,4 +1,4 @@
-import { db, type Symptom, defaultSymptomInputs } from './index';
+import { db, type Symptom, type SymptomInputs, defaultSymptomInputs } from './index';
 import { newId } from '$lib/utils/uuid';
 
 export interface CreateSymptomInput {
@@ -184,4 +184,8 @@ export async function reorderSiblings(parentId: string | null, orderedIds: strin
       await db.symptoms.update(id, { sortIndex: i, updatedAt: nowTs });
     }
   });
+}
+
+export function hasEnabledInput(inputs: SymptomInputs): boolean {
+  return inputs.slider.enabled || inputs.number.enabled || inputs.comment.enabled;
 }

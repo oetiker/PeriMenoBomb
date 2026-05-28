@@ -47,3 +47,27 @@ export async function listEntriesForDate(date: string): Promise<Entry[]> {
 export async function listEntriesForRange(fromDate: string, toDate: string): Promise<Entry[]> {
   return db.entries.where('date').between(fromDate, toDate, true, true).toArray();
 }
+
+import type { Symptom } from './index';
+
+export type EntryValidationField = 'slider' | 'number' | 'comment';
+
+export interface EntryValidationResult {
+  ok: boolean;
+  missing: EntryValidationField[];
+}
+
+export interface EntryFieldsLike {
+  sliderValue: number | null;
+  numberValue: number | null;
+  comment: string;
+}
+
+export function validateEntry(symptom: Symptom, entry: EntryFieldsLike): EntryValidationResult {
+  const missing: EntryValidationField[] = [];
+  const i = symptom.inputs;
+  if (i.slider.enabled && i.slider.required && entry.sliderValue === null) missing.push('slider');
+  if (i.number.enabled && i.number.required && (entry.numberValue === null || Number.isNaN(entry.numberValue))) missing.push('number');
+  if (i.comment.enabled && i.comment.required && entry.comment.trim().length === 0) missing.push('comment');
+  return { ok: missing.length === 0, missing };
+}

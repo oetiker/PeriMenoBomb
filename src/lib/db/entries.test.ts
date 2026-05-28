@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDatabase } from './index';
+import type { Symptom } from './index';
+import { defaultSymptomInputs } from './index';
 import { upsertEntry, getEntry, deleteEntry, listEntriesForDate, listEntriesForRange, hasEntry } from './entries';
+import { validateEntry } from './entries';
 
 describe('entries', () => {
   beforeEach(() => resetDatabase());
@@ -50,5 +53,78 @@ describe('entries', () => {
 
   it('rejects invalid date format', async () => {
     await expect(upsertEntry({ date: '27.05.2026', symptomId: 'x' })).rejects.toThrow();
+  });
+});
+
+function symptom(partial: Partial<Symptom> = {}): Symptom {
+  return {
+    id: 's', name: 'X', color: '#000', icon: 'circle',
+    tagIds: [], parentId: null, sortIndex: 0, depth: 0,
+    isFolder: false, archived: false, createdAt: 0, updatedAt: 0,
+    inputs: defaultSymptomInputs(), daily: false, ...partial
+  };
+}
+
+describe('validateEntry', () => {
+  it('ok when no input is required', () => {
+    const s = symptom();
+    expect(validateEntry(s, { sliderValue: null, numberValue: null, comment: '' }))
+      .toEqual({ ok: true, missing: [] });
+  });
+
+  it('reports slider missing when slider is required and value is null', () => {
+    const inputs = defaultSymptomInputs();
+    inputs.slider.enabled = true;
+    inputs.slider.required = true;
+    const s = symptom({ inputs });
+    expect(validateEntry(s, { sliderValue: null, numberValue: null, comment: '' }))
+      .toEqual({ ok: false, missing: ['slider'] });
+  });
+
+  it('slider ok with any 1..100 value', () => {
+    const inputs = defaultSymptomInputs();
+    inputs.slider.enabled = true;
+    inputs.slider.required = true;
+    const s = symptom({ inputs });
+    expect(validateEntry(s, { sliderValue: 1, numberValue: null, comment: '' }).ok).toBe(true);
+    expect(validateEntry(s, { sliderValue: 100, numberValue: null, comment: '' }).ok).toBe(true);
+  });
+
+  it('reports number missing when required and null', () => {
+    const inputs = defaultSymptomInputs();
+    inputs.number.enabled = true;
+    inputs.number.required = true;
+    const s = symptom({ inputs });
+    expect(validateEntry(s, { sliderValue: null, numberValue: null, comment: '' }))
+      .toEqual({ ok: false, missing: ['number'] });
+  });
+
+  it('reports comment missing when required and empty/whitespace', () => {
+    const inputs = defaultSymptomInputs();
+    inputs.comment.enabled = true;
+    inputs.comment.required = true;
+    const s = symptom({ inputs });
+    expect(validateEntry(s, { sliderValue: null, numberValue: null, comment: '' }))
+      .toEqual({ ok: false, missing: ['comment'] });
+    expect(validateEntry(s, { sliderValue: null, numberValue: null, comment: '   ' }))
+      .toEqual({ ok: false, missing: ['comment'] });
+    expect(validateEntry(s, { sliderValue: null, numberValue: null, comment: 'note' }).ok).toBe(true);
+  });
+
+  it('aggregates multiple missing pieces in order slider, number, comment', () => {
+    const inputs = defaultSymptomInputs();
+    inputs.slider.enabled  = true; inputs.slider.required  = true;
+    inputs.number.enabled  = true; inputs.number.required  = true;
+    inputs.comment.enabled = true; inputs.comment.required = true;
+    const s = symptom({ inputs });
+    expect(validateEntry(s, { sliderValue: null, numberValue: null, comment: '' }))
+      .toEqual({ ok: false, missing: ['slider', 'number', 'comment'] });
+  });
+
+  it('disabled input never triggers missing even if required somehow true', () => {
+    const inputs = defaultSymptomInputs();
+    inputs.slider.enabled = false; inputs.slider.required = true; // contradictory state
+    const s = symptom({ inputs });
+    expect(validateEntry(s, { sliderValue: null, numberValue: null, comment: '' }).ok).toBe(true);
   });
 });

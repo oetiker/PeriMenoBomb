@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDatabase, db, defaultSymptomInputs } from './index';
 import { createSymptom, updateSymptom, getSymptom, archiveSymptom, listAllSymptoms, listChildren } from './symptoms';
-import { moveSymptom, reorderSiblings, subtreeDepth, listTree } from './symptoms';
+import { moveSymptom, reorderSiblings, subtreeDepth, listTree, hasEnabledInput } from './symptoms';
 
 describe('symptoms CRUD', () => {
   beforeEach(() => resetDatabase());
@@ -126,5 +126,16 @@ describe('symptoms hierarchy', () => {
     const tree = await listTree();
     expect(tree[0].name).toBe('R');
     expect(tree[0].children[0].name).toBe('Child');
+  });
+});
+
+describe('hasEnabledInput', () => {
+  it('false when all inputs disabled', () => {
+    expect(hasEnabledInput(defaultSymptomInputs())).toBe(false);
+  });
+  it('true when any input enabled', () => {
+    const inputs = defaultSymptomInputs();
+    inputs.comment.enabled = true;
+    expect(hasEnabledInput(inputs)).toBe(true);
   });
 });
