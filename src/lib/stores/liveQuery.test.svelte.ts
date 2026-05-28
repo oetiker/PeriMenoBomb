@@ -18,8 +18,8 @@ describe('liveQuery rune adapter', () => {
 
   it('liveQueryEffect re-subscribes when deps change', async () => {
     await db.entries.bulkAdd([
-      { id: '2026-05-27__s1', date: '2026-05-27', symptomId: 's1', intensity: null, comment: '', updatedAt: 1 },
-      { id: '2026-05-28__s1', date: '2026-05-28', symptomId: 's1', intensity: 'mittel', comment: '', updatedAt: 1 }
+      { id: '2026-05-27__s1', date: '2026-05-27', symptomId: 's1', sliderValue: null, numberValue: null, comment: '', updatedAt: 1 },
+      { id: '2026-05-28__s1', date: '2026-05-28', symptomId: 's1', sliderValue: 50, numberValue: null, comment: '', updatedAt: 1 }
     ]);
 
     let date = $state('2026-05-27');

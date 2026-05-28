@@ -37,15 +37,14 @@ export function defaultSymptomInputs(): SymptomInputs {
   };
 }
 
-export type Intensity = 'leicht' | 'mittel' | 'stark' | null;
-
 export interface Entry {
-  id: string;          // `${date}__${symptomId}`
-  date: string;        // YYYY-MM-DD
-  symptomId: string;
-  intensity: Intensity;
-  comment: string;
-  updatedAt: number;
+  id:          string;
+  date:        string;
+  symptomId:   string;
+  sliderValue: number | null;
+  numberValue: number | null;
+  comment:     string;
+  updatedAt:   number;
 }
 
 export interface MetaRow {

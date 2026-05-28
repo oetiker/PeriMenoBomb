@@ -3,7 +3,7 @@
   import Modal from '$lib/components/ui/Modal.svelte';
   import Badge from '$lib/components/ui/Badge.svelte';
   import { upsertEntry, deleteEntry, getEntry } from '$lib/db/entries';
-  import { db, type Symptom, type Intensity } from '$lib/db';
+  import { db, type Symptom } from '$lib/db';
   import { snackbar } from '$lib/stores/snackbar.svelte';
   import { isValidDateKey, formatLong } from '$lib/utils/date';
 
@@ -13,7 +13,8 @@
   // workingDate tracks the entry's current date. Moves the entry between dates
   // when the user picks a new value.
   let workingDate = $state(untrack(() => date));
-  let intensity = $state<Intensity>(null);
+  let sliderValue = $state<number | null>(null);
+  let numberValue = $state<number | null>(null);
   let comment = $state('');
 
   $effect(() => {
@@ -21,22 +22,11 @@
     workingDate = date;
     (async () => {
       const e = await getEntry(date, symptom.id);
-      intensity = e?.intensity ?? null;
+      sliderValue = e?.sliderValue ?? null;
+      numberValue = e?.numberValue ?? null;
       comment = e?.comment ?? '';
     })();
   });
-
-  const LEVELS: { value: Intensity; label: string }[] = [
-    { value: null, label: '— ohne' },
-    { value: 'leicht', label: 'Leicht' },
-    { value: 'mittel', label: 'Mittel' },
-    { value: 'stark', label: 'Stark' }
-  ];
-
-  async function pick(v: Intensity) {
-    intensity = v;
-    await upsertEntry({ date: workingDate, symptomId: symptom.id, intensity: v });
-  }
 
   async function onCommentBlur(e: FocusEvent) {
     const v = (e.target as HTMLTextAreaElement).value;
@@ -50,13 +40,16 @@
     const oldDate = workingDate;
     await db.transaction('rw', db.entries, async () => {
       const existing = await getEntry(oldDate, symptom.id);
-      const carry = existing ?? { intensity, comment };
+      const carrySlider = existing?.sliderValue ?? null;
+      const carryNumber = existing?.numberValue ?? null;
+      const carryComment = existing?.comment ?? comment;
       await deleteEntry(oldDate, symptom.id);
       await upsertEntry({
         date: v,
         symptomId: symptom.id,
-        intensity: carry.intensity,
-        comment: carry.comment
+        sliderValue: carrySlider,
+        numberValue: carryNumber,
+        comment: carryComment
       });
     });
     workingDate = v;
@@ -66,7 +59,7 @@
       onAction: async () => {
         await db.transaction('rw', db.entries, async () => {
           await deleteEntry(v, symptom.id);
-          await upsertEntry({ date: oldDate, symptomId: symptom.id, intensity, comment });
+          await upsertEntry({ date: oldDate, symptomId: symptom.id, sliderValue: null, numberValue: null, comment });
         });
         workingDate = oldDate;
       }
@@ -82,7 +75,7 @@
 
   async function remove() {
     await deleteEntry(workingDate, symptom.id);
-    const carry = { date: workingDate, intensity, comment };
+    const carry = { date: workingDate, comment };
     snackbar.show({
       message: `${symptom.name} entfernt`,
       actionLabel: 'Rückgängig',
@@ -90,7 +83,8 @@
         await upsertEntry({
           date: carry.date,
           symptomId: symptom.id,
-          intensity: carry.intensity,
+          sliderValue: null,
+          numberValue: null,
           comment: carry.comment
         });
       }
@@ -120,19 +114,6 @@
   </section>
 
   <section>
-    <div class="caption">Intensität</div>
-    <div class="row">
-      {#each LEVELS as lvl}
-        <button
-          type="button"
-          class="ibtn {intensity === lvl.value ? 'active' : ''}"
-          onclick={() => pick(lvl.value)}
-        >{lvl.label}</button>
-      {/each}
-    </div>
-  </section>
-
-  <section>
     <div class="caption">Kommentar (optional)</div>
     <textarea
       class="comment"
@@ -151,9 +132,6 @@
   .header { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); }
   .header h3 { margin: 0; font-size: var(--fs-lg); }
   .caption { font-size: var(--fs-xs); color: var(--c-text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--sp-2); }
-  .row { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-4); }
-  .ibtn { flex: 1; padding: var(--sp-3); border-radius: var(--r-2); border: 1px solid var(--c-border); background: var(--c-surface); cursor: pointer; }
-  .ibtn.active { background: var(--c-primary); color: var(--c-primary-contrast); border-color: var(--c-primary); }
   .comment { width: 100%; padding: var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--r-2); resize: vertical; font: inherit; box-sizing: border-box; }
   section { margin-bottom: var(--sp-4); }
   .primary { width: 100%; background: var(--c-primary); color: var(--c-primary-contrast); border: 0; padding: var(--sp-3); border-radius: var(--r-2); font-weight: var(--fw-bold); cursor: pointer; }

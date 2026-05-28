@@ -1,10 +1,11 @@
-import { db, entryKey, type Entry, type Intensity } from './index';
+import { db, type Entry, entryKey } from './index';
 import { isValidDateKey } from '$lib/utils/date';
 
 export interface UpsertEntryInput {
   date: string;
   symptomId: string;
-  intensity?: Intensity;
+  sliderValue?: number | null;
+  numberValue?: number | null;
   comment?: string;
 }
 
@@ -18,9 +19,10 @@ export async function upsertEntry(input: UpsertEntryInput): Promise<Entry> {
     id,
     date: input.date,
     symptomId: input.symptomId,
-    intensity: input.intensity !== undefined ? input.intensity : existing?.intensity ?? null,
-    comment: input.comment !== undefined ? input.comment : existing?.comment ?? '',
-    updatedAt: Date.now()
+    sliderValue: input.sliderValue !== undefined ? input.sliderValue : existing?.sliderValue ?? null,
+    numberValue: input.numberValue !== undefined ? input.numberValue : existing?.numberValue ?? null,
+    comment:     input.comment     !== undefined ? input.comment     : existing?.comment     ?? '',
+    updatedAt:   Date.now()
   };
   await db.entries.put(merged);
   return merged;

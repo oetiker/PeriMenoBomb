@@ -22,7 +22,13 @@
     snackbar.show({
       message: `${s.name} entfernt`,
       actionLabel: 'Rückgängig',
-      onAction: () => upsertEntry({ date: original.date, symptomId: original.symptomId, intensity: original.intensity, comment: original.comment })
+      onAction: () => upsertEntry({
+        date: original.date,
+        symptomId: original.symptomId,
+        sliderValue: original.sliderValue,
+        numberValue: original.numberValue,
+        comment: original.comment
+      })
     });
   }
 </script>

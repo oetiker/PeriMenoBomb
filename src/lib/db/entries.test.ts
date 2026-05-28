@@ -8,14 +8,15 @@ describe('entries', () => {
   it('upsert creates a new entry with deterministic id', async () => {
     const e = await upsertEntry({ date: '2026-05-27', symptomId: 'sym1' });
     expect(e.id).toBe('2026-05-27__sym1');
-    expect(e.intensity).toBeNull();
+    expect(e.sliderValue).toBeNull();
+    expect(e.numberValue).toBeNull();
     expect(e.comment).toBe('');
   });
 
   it('upsert preserves existing values when patch is partial', async () => {
-    await upsertEntry({ date: '2026-05-27', symptomId: 'sym1', intensity: 'mittel' });
+    await upsertEntry({ date: '2026-05-27', symptomId: 'sym1', sliderValue: 50 });
     const e = await upsertEntry({ date: '2026-05-27', symptomId: 'sym1', comment: 'Notiz' });
-    expect(e.intensity).toBe('mittel');
+    expect(e.sliderValue).toBe(50);
     expect(e.comment).toBe('Notiz');
   });
 

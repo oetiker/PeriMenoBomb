@@ -8,7 +8,7 @@
   let { entry, symptom, onTap, onSwipe }: Props = $props();
 
   const intensityLabel = $derived(
-    entry.intensity ? entry.intensity.charAt(0).toUpperCase() + entry.intensity.slice(1) : 'erfasst'
+    entry.sliderValue !== null ? String(entry.sliderValue) : 'erfasst'
   );
 </script>
 
@@ -18,7 +18,7 @@
     <div class="text">
       <div class="name">{symptom.name}</div>
       <div class="meta">
-        <span class={`level level-${entry.intensity ?? 'none'}`}>{intensityLabel}</span>
+        <span class={`level level-${entry.sliderValue ?? 'none'}`}>{intensityLabel}</span>
         {#if entry.comment}<MessageCircle size={14} />{/if}
       </div>
     </div>
