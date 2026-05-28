@@ -133,6 +133,14 @@
 
   type DropTarget = { parentId: string | null; beforeId: string | null };
 
+  function currentDropTarget(): DropTarget {
+    if (!dragState) return { parentId: null, beforeId: null };
+    const sibs = findSiblings(dragState.parentId);
+    const curIdx = sibs.findIndex((s) => s.id === dragState!.id);
+    const beforeId = curIdx >= 0 ? sibs[curIdx + 1]?.id ?? null : null;
+    return { parentId: dragState.parentId, beforeId };
+  }
+
   function computeDropTarget(y: number): DropTarget {
     const rows = visibleRowsExcludingDragged();
     if (rows.length === 0) return { parentId: null, beforeId: null };
@@ -174,17 +182,28 @@
       return { parentId, beforeId: next?.id ?? null };
     }
 
-    // Cursor above first or below last row.
+    // Cursor is not inside any visible row. Three sub-cases:
+    //   a) above the first visible row → drop at start of that parent
+    //   b) below the last visible row → drop at end of that parent
+    //   c) in the gap left by the dragged subtree (between two visible rows)
+    //      → keep the current target. This is what gives the drag its natural
+    //      hysteresis: as long as the cursor is over the empty slot, the item
+    //      stays where it is.
     const first = rows[0];
     const firstEl = rowRefs.get(first.node.id);
     if (firstEl && y < firstEl.getBoundingClientRect().top) {
       cancelHoverExpand();
       return { parentId: first.parentId, beforeId: first.node.id };
     }
-    cancelHoverExpand();
     const last = rows[rows.length - 1];
-    const lastNext = nextNonDraggedSiblingOf(last.node.id, last.parentId);
-    return { parentId: last.parentId, beforeId: lastNext?.id ?? null };
+    const lastEl = rowRefs.get(last.node.id);
+    if (lastEl && y >= lastEl.getBoundingClientRect().bottom) {
+      cancelHoverExpand();
+      const lastNext = nextNonDraggedSiblingOf(last.node.id, last.parentId);
+      return { parentId: last.parentId, beforeId: lastNext?.id ?? null };
+    }
+    cancelHoverExpand();
+    return currentDropTarget();
   }
 
   // ─── Apply drop target (mutate localTree) ──────────────────
@@ -308,21 +327,29 @@
     cancelHoverExpand();
     if (!dragState) return;
     const finished = dragState;
+
+    // Snapshot the in-drag sibling orders *before* clearing dragState. The
+    // `$effect` that resets localTree to `treeQ.current` runs on the next
+    // await, wiping the in-drag mutations. Calling findSiblings afterwards
+    // would return the pre-drag DB order — so the cross-parent reorder
+    // would not include the moved item, and it would stay at the end
+    // (where moveSymptom appends it by default).
+    const newSibIds = findSiblings(finished.parentId).map((s) => s.id);
+    const origSibIds = (finished.originalParentId !== finished.parentId)
+      ? findSiblings(finished.originalParentId).map((s) => s.id)
+      : null;
+
     dragState = null;
 
     try {
       if (finished.parentId !== finished.originalParentId) {
         await moveSymptom(finished.id, finished.parentId);
       }
-      const newSibs = findSiblings(finished.parentId);
-      if (newSibs.length > 0) {
-        await reorderSiblings(finished.parentId, newSibs.map((s) => s.id));
+      if (newSibIds.length > 0) {
+        await reorderSiblings(finished.parentId, newSibIds);
       }
-      if (finished.originalParentId !== finished.parentId) {
-        const origSibs = findSiblings(finished.originalParentId);
-        if (origSibs.length > 0) {
-          await reorderSiblings(finished.originalParentId, origSibs.map((s) => s.id));
-        }
+      if (origSibIds && origSibIds.length > 0) {
+        await reorderSiblings(finished.originalParentId, origSibIds);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -348,6 +375,23 @@
     const naturalTop = listTop + draggedIdx * ds.rowHeight;
     const wantedTop = ds.currentY - ds.grabOffsetY;
     return `translateY(${wantedTop - naturalTop}px)`;
+  }
+
+  // How many flattened (visible) rows the dragged subtree spans.
+  function draggedSubtreeRowCount(): number {
+    const ds = dragState;
+    if (!ds) return 0;
+    const dragged = findNodeById(localTree, ds.id);
+    if (!dragged) return 0;
+    let count = 0;
+    function recur(node: TreeNode) {
+      count++;
+      if (node.isFolder && expanded.has(node.id)) {
+        for (const c of node.children) recur(c);
+      }
+    }
+    recur(dragged);
+    return count;
   }
 
   // ─── Toggle / create / edit ────────────────────────────────
@@ -449,6 +493,14 @@
 <ul class="list" bind:this={listEl}>
   {#each localTree as n (n.id)}{@render renderNode(n, null, 0)}{/each}
   {#if localTree.length === 0}<li class="empty">Noch keine Symptome.</li>{/if}
+  {#if dragState}
+    <li
+      class="drop-placeholder"
+      aria-hidden="true"
+      style:top="{draggedVisibleIndex() * dragState.rowHeight}px"
+      style:height="{draggedSubtreeRowCount() * dragState.rowHeight}px"
+    ></li>
+  {/if}
 </ul>
 
 {#if editing}
@@ -473,7 +525,18 @@
     color: var(--c-text);
     cursor: pointer;
   }
-  .list { list-style: none; margin: 0; padding: 0; }
+  .list { list-style: none; margin: 0; padding: 0; position: relative; }
+  .drop-placeholder {
+    position: absolute;
+    left: var(--sp-2);
+    right: var(--sp-2);
+    box-sizing: border-box;
+    border: 1px dashed var(--c-accent, var(--c-text-dim));
+    border-radius: var(--r-2);
+    background: color-mix(in srgb, var(--c-accent, var(--c-text-dim)) 10%, transparent);
+    pointer-events: none;
+    z-index: 1;
+  }
   .row {
     position: relative;
     display: flex; align-items: center; gap: 0;
