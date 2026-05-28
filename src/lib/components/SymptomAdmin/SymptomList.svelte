@@ -6,6 +6,8 @@
     listTree,
     reorderSiblings,
     moveSymptom,
+    listArchivedSymptoms,
+    unarchiveSymptom,
     DEFAULT_COLOR,
     DEFAULT_ICON,
     DEFAULT_FOLDER_ICON,
@@ -14,10 +16,30 @@
   import { liveQuery } from '$lib/stores/liveQuery.svelte';
   import { snackbar } from '$lib/stores/snackbar.svelte';
   import { pendingRestore } from '$lib/stores/openDialog.svelte';
-  import { type Symptom, defaultSymptomInputs } from '$lib/db';
+  import { db, type Symptom, defaultSymptomInputs } from '$lib/db';
 
   const treeQ = liveQuery(() => listTree(), [] as TreeNode[]);
   $effect(() => () => treeQ.dispose());
+
+  const archivedQ = liveQuery(() => listArchivedSymptoms(), [] as Symptom[]);
+  $effect(() => () => archivedQ.dispose());
+  // All symptoms (including archived) so we can resolve a parent's name even
+  // if that parent itself was archived.
+  const allSymptomsQ = liveQuery(() => db.symptoms.toArray(), [] as Symptom[]);
+  $effect(() => () => allSymptomsQ.dispose());
+
+  let showArchived = $state(false);
+
+  function parentNameOf(s: Symptom): string | null {
+    if (!s.parentId) return null;
+    const p = allSymptomsQ.current.find((x) => x.id === s.parentId);
+    return p?.name ?? null;
+  }
+
+  async function restore(s: Symptom) {
+    await unarchiveSymptom(s.id);
+    snackbar.show({ message: `${s.name} wiederhergestellt` });
+  }
 
   let expanded = $state(new Set<string>());
   let editing = $state<{ symptom: Symptom; isNew: boolean } | null>(null);
@@ -568,6 +590,34 @@
   {/if}
 </ul>
 
+{#if archivedQ.current.length > 0}
+  <div class="archive-block">
+    <button
+      type="button"
+      class="archive-toggle"
+      onclick={() => (showArchived = !showArchived)}
+      aria-expanded={showArchived}
+    >
+      {showArchived ? 'Archiv ausblenden' : 'Archiv anzeigen'} ({archivedQ.current.length})
+    </button>
+    {#if showArchived}
+      <ul class="archived-list">
+        {#each archivedQ.current as s (s.id)}
+          {@const pn = parentNameOf(s)}
+          <li class="archived-row">
+            <div class="archived-badge"><Badge icon={s.icon} color={s.color} size={28} archived /></div>
+            <div class="archived-text">
+              <div class="archived-name">{s.name}</div>
+              {#if pn}<div class="archived-parent">im Ordner: {pn}</div>{/if}
+            </div>
+            <button type="button" class="restore-btn" onclick={() => restore(s)}>Wiederherstellen</button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
+{/if}
+
 {#if editing}
   <SymptomEditModal
     open={true}
@@ -653,4 +703,46 @@
   }
   .drag-handle:active { cursor: grabbing; color: var(--c-text); }
   .empty { padding: var(--sp-5); text-align: center; color: var(--c-text-dim); }
+
+  .archive-block {
+    margin: var(--sp-4);
+    padding-top: var(--sp-3);
+    border-top: 1px solid var(--c-border);
+  }
+  .archive-toggle {
+    background: none;
+    border: 0;
+    padding: var(--sp-2) 0;
+    color: var(--c-text-dim);
+    font-size: var(--fs-sm);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .archived-list {
+    list-style: none;
+    margin: var(--sp-2) 0 0;
+    padding: 0;
+  }
+  .archived-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-2) 0;
+    border-bottom: 1px solid var(--c-border);
+  }
+  .archived-badge { flex-shrink: 0; }
+  .archived-text { flex: 1; min-width: 0; }
+  .archived-name { color: var(--c-text-dim); font-weight: var(--fw-medium); }
+  .archived-parent { font-size: var(--fs-xs); color: var(--c-text-dim); font-style: italic; }
+  .restore-btn {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-2);
+    padding: var(--sp-2) var(--sp-3);
+    cursor: pointer;
+    color: var(--c-text);
+    font-size: var(--fs-sm);
+    flex-shrink: 0;
+  }
+  .restore-btn:hover { background: var(--c-surface-2); }
 </style>

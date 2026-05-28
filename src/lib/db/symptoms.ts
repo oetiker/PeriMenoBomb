@@ -71,6 +71,15 @@ export async function archiveSymptom(id: string): Promise<void> {
   await db.symptoms.update(id, { archived: true, updatedAt: Date.now() });
 }
 
+export async function listArchivedSymptoms(): Promise<Symptom[]> {
+  const rows = await db.symptoms.filter((s) => s.archived).toArray();
+  return rows.sort((a, b) => b.updatedAt - a.updatedAt); // most recently archived first
+}
+
+export async function unarchiveSymptom(id: string): Promise<void> {
+  await db.symptoms.update(id, { archived: false, updatedAt: Date.now() });
+}
+
 export async function listAllSymptoms(): Promise<Symptom[]> {
   return db.symptoms.toArray();
 }

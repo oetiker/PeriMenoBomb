@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDatabase, db, defaultSymptomInputs } from './index';
-import { createSymptom, updateSymptom, getSymptom, archiveSymptom, listAllSymptoms, listChildren } from './symptoms';
+import { createSymptom, updateSymptom, getSymptom, archiveSymptom, listAllSymptoms, listChildren, listArchivedSymptoms, unarchiveSymptom } from './symptoms';
 import { moveSymptom, reorderSiblings, subtreeDepth, listTree, hasEnabledInput, listDailySymptomsForDate } from './symptoms';
 import { upsertEntry } from './entries';
 
@@ -173,5 +173,40 @@ describe('listDailySymptomsForDate', () => {
   it('returns empty list when no daily symptoms', async () => {
     await createSymptom({ name: 'X' });
     expect(await listDailySymptomsForDate('2026-05-28')).toEqual([]);
+  });
+});
+
+describe('archive', () => {
+  beforeEach(() => resetDatabase());
+
+  it('listArchivedSymptoms returns only archived rows, newest first', async () => {
+    const a = await createSymptom({ name: 'A' });
+    const b = await createSymptom({ name: 'B' });
+    const c = await createSymptom({ name: 'C' });
+    await archiveSymptom(a.id);
+    // bump b's updatedAt by archiving last so it should sort first
+    await new Promise((r) => setTimeout(r, 5));
+    await archiveSymptom(b.id);
+    const archived = await listArchivedSymptoms();
+    expect(archived.map((s) => s.name)).toEqual(['B', 'A']);
+    // c is not archived → not in the list
+    expect(archived.find((s) => s.id === c.id)).toBeUndefined();
+  });
+
+  it('unarchiveSymptom flips archived back and re-appears in listTree', async () => {
+    const a = await createSymptom({ name: 'A' });
+    await archiveSymptom(a.id);
+    expect((await listTree()).find((n) => n.id === a.id)).toBeUndefined();
+    await unarchiveSymptom(a.id);
+    const tree = await listTree();
+    expect(tree.find((n) => n.id === a.id)).toBeTruthy();
+    const fresh = await db.symptoms.get(a.id);
+    expect(fresh?.archived).toBe(false);
+  });
+
+  it('unarchiveSymptom on an unarchived row is a no-op', async () => {
+    const a = await createSymptom({ name: 'A' });
+    await unarchiveSymptom(a.id);
+    expect((await db.symptoms.get(a.id))?.archived).toBe(false);
   });
 });
