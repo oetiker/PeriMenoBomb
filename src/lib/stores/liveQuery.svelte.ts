@@ -17,12 +17,20 @@ export function liveQuery<T>(query: () => Promise<T> | T, initial: T): ReactiveQ
   };
 }
 
-// Bind a Dexie liveQuery to a Svelte $effect lifetime — auto-resubscribes
-// when reactive dependencies inside `query` change, and disposes on unmount.
-// MUST be called inside a component or $effect root.
-export function liveQueryEffect<T>(query: () => Promise<T> | T, initial: T): { readonly current: T } {
+// Bind a Dexie liveQuery to a Svelte $effect lifetime.
+// `deps` is an optional thunk that reads the reactive values the query depends
+// on (e.g., a `date` prop). Svelte tracks reads inside the effect body, so the
+// thunk must touch every reactive value that, when changed, should re-subscribe
+// the query. If the query closes over only constant values, omit `deps`.
+// MUST be called inside a component or `$effect.root`.
+export function liveQueryEffect<T>(
+  query: () => Promise<T> | T,
+  initial: T,
+  deps?: () => unknown
+): { readonly current: T } {
   let value = $state<T>(initial);
   $effect(() => {
+    if (deps) deps(); // register reactive reads so $effect re-runs
     const sub = dexieLive(query).subscribe({
       next: (v) => { value = v as T; },
       error: (err) => { console.error('liveQuery error', err); }

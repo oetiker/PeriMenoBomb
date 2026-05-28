@@ -20,7 +20,11 @@
   const firstRunQ = liveQuery(async () => await getOrDefault('firstRunCompleted', false), false);
   $effect(() => () => firstRunQ.dispose());
 
-  const entriesQ = liveQueryEffect(() => listEntriesForDate(currentDate.value), [] as Entry[]);
+  const entriesQ = liveQueryEffect(
+    () => listEntriesForDate(currentDate.value),
+    [] as Entry[],
+    () => currentDate.value
+  );
   const symptomsQ = liveQueryEffect(() => db.symptoms.toArray(), [] as Symptom[]);
 
   const enteredIds = $derived(new Set(entriesQ.current.map((e) => e.symptomId)));

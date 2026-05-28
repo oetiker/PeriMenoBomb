@@ -1,9 +1,15 @@
 <script lang="ts">
   import Badge from '$lib/components/ui/Badge.svelte';
   import SymptomEditModal from './SymptomEditModal.svelte';
-  import PromptModal from '$lib/components/ui/PromptModal.svelte';
   import { ChevronDown, ChevronRight, Plus } from '@lucide/svelte';
-  import { listTree, createSymptom, reorderSiblings, type TreeNode } from '$lib/db/symptoms';
+  import {
+    listTree,
+    reorderSiblings,
+    DEFAULT_COLOR,
+    DEFAULT_ICON,
+    DEFAULT_FOLDER_ICON,
+    type TreeNode
+  } from '$lib/db/symptoms';
   import { liveQuery } from '$lib/stores/liveQuery.svelte';
   import { dndzone, type DndEvent } from 'svelte-dnd-action';
   import type { Symptom } from '$lib/db';
@@ -12,9 +18,8 @@
   $effect(() => () => treeQ.dispose());
 
   let expanded = $state(new Set<string>());
-  let editing = $state<Symptom | null>(null);
+  let editing = $state<{ symptom: Symptom; isNew: boolean } | null>(null);
   let reorderMode = $state(false);
-  let addPrompt = $state<{ isFolder: boolean } | null>(null);
 
   function toggle(id: string) {
     if (expanded.has(id)) expanded.delete(id);
@@ -23,12 +28,26 @@
   }
 
   function startAdd(isFolder: boolean) {
-    addPrompt = { isFolder };
+    // Synthetic draft Symptom — never persisted unless the user clicks Anlegen.
+    const draft: Symptom = {
+      id: '',
+      name: '',
+      color: DEFAULT_COLOR,
+      icon: isFolder ? DEFAULT_FOLDER_ICON : DEFAULT_ICON,
+      tagIds: [],
+      parentId: null,
+      sortIndex: 0,
+      depth: 0,
+      isFolder,
+      archived: false,
+      createdAt: 0,
+      updatedAt: 0
+    };
+    editing = { symptom: draft, isNew: true };
   }
-  async function onAddSubmit(name: string) {
-    const s = addPrompt;
-    addPrompt = null;
-    if (s) await createSymptom({ name, isFolder: s.isFolder });
+
+  function startEdit(s: Symptom) {
+    editing = { symptom: s, isNew: false };
   }
 
   function handleConsider(_parentId: string | null, _e: CustomEvent<DndEvent<TreeNode>>) {
@@ -61,7 +80,7 @@
     {:else}
       <span class="chev-spacer"></span>
     {/if}
-    <button type="button" class="entry" onclick={() => editing = node}>
+    <button type="button" class="entry" onclick={() => startEdit(node)}>
       <Badge icon={node.icon} color={node.color} size={28} />
       <span>{node.name}</span>
     </button>
@@ -82,17 +101,13 @@
 </ul>
 
 {#if editing}
-  <SymptomEditModal open={true} symptom={editing} onClose={() => editing = null} />
+  <SymptomEditModal
+    open={true}
+    symptom={editing.symptom}
+    isNew={editing.isNew}
+    onClose={() => (editing = null)}
+  />
 {/if}
-
-<PromptModal
-  open={addPrompt !== null}
-  title={addPrompt?.isFolder ? 'Neuer Ordner' : 'Neues Symptom'}
-  label="Name"
-  placeholder={addPrompt?.isFolder ? 'z.B. Körperlich' : 'z.B. Hitzewallungen'}
-  onSubmit={onAddSubmit}
-  onCancel={() => (addPrompt = null)}
-/>
 
 <style>
   .bar { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-4); border-bottom: 1px solid var(--c-border); }

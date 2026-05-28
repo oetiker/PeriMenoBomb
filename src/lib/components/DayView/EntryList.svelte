@@ -10,7 +10,7 @@
   let { date }: Props = $props();
 
   // liveQueryEffect re-subscribes when `date` changes — important for date-picker navigation.
-  const entriesQ = liveQueryEffect(() => listEntriesForDate(date), [] as Entry[]);
+  const entriesQ = liveQueryEffect(() => listEntriesForDate(date), [] as Entry[], () => date);
   const symptomsQ = liveQueryEffect(() => db.symptoms.toArray(), [] as Symptom[]);
   const symptomMap = $derived(new Map(symptomsQ.current.map((s) => [s.id, s])));
 

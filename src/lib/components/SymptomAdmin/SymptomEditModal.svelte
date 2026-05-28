@@ -4,12 +4,23 @@
   import ColorPicker from '$lib/components/ui/ColorPicker.svelte';
   import IconPicker from '$lib/components/ui/IconPicker.svelte';
   import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
-  import { updateSymptom, archiveSymptom, moveSymptom, listAllSymptoms } from '$lib/db/symptoms';
+  import {
+    createSymptom,
+    updateSymptom,
+    archiveSymptom,
+    moveSymptom,
+    listAllSymptoms
+  } from '$lib/db/symptoms';
   import { liveQuery } from '$lib/stores/liveQuery.svelte';
   import { db, type Symptom, type Tag } from '$lib/db';
 
-  type Props = { open: boolean; symptom: Symptom; onClose: () => void };
-  let { open, symptom, onClose }: Props = $props();
+  type Props = {
+    open: boolean;
+    symptom: Symptom;
+    isNew?: boolean;
+    onClose: () => void;
+  };
+  let { open, symptom, isNew = false, onClose }: Props = $props();
 
   let name = $state(symptom.name);
   let color = $state(symptom.color);
@@ -19,8 +30,11 @@
   let view = $state<'main' | 'icons'>('main');
 
   $effect(() => {
-    name = symptom.name; color = symptom.color; icon = symptom.icon;
-    tagIds = [...symptom.tagIds]; parentId = symptom.parentId;
+    name = symptom.name;
+    color = symptom.color;
+    icon = symptom.icon;
+    tagIds = [...symptom.tagIds];
+    parentId = symptom.parentId;
     view = 'main';
   });
 
@@ -33,26 +47,43 @@
   }
 
   async function save() {
-    await updateSymptom(symptom.id, { name, color, icon, tagIds: $state.snapshot(tagIds) });
-    if (parentId !== symptom.parentId) {
-      await moveSymptom(symptom.id, parentId);
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+    const snapTags = $state.snapshot(tagIds);
+    if (isNew) {
+      await createSymptom({
+        name: trimmedName,
+        isFolder: symptom.isFolder,
+        parentId,
+        color,
+        icon,
+        tagIds: snapTags
+      });
+    } else {
+      await updateSymptom(symptom.id, { name: trimmedName, color, icon, tagIds: snapTags });
+      if (parentId !== symptom.parentId) {
+        await moveSymptom(symptom.id, parentId);
+      }
     }
     onClose();
   }
 
   let archiveConfirm = $state(false);
-
-  function startArchive() {
-    archiveConfirm = true;
-  }
+  function startArchive() { archiveConfirm = true; }
   async function doArchive() {
     archiveConfirm = false;
     await archiveSymptom(symptom.id);
     onClose();
   }
+
+  const title = $derived(
+    isNew
+      ? (symptom.isFolder ? 'Neuer Ordner' : 'Neues Symptom')
+      : (symptom.isFolder ? 'Ordner bearbeiten' : 'Symptom bearbeiten')
+  );
 </script>
 
-<Modal {open} onClose={onClose} title={symptom.isFolder ? 'Ordner bearbeiten' : 'Symptom bearbeiten'}>
+<Modal {open} {onClose} {title}>
   {#if view === 'icons'}
     <IconPicker value={icon} {color} onChange={(i) => { icon = i; view = 'main'; }} />
     <button type="button" class="link" onclick={() => view = 'main'}>‹ Zurück</button>
@@ -61,7 +92,7 @@
 
     <label class="field">
       <span>Name</span>
-      <input type="text" bind:value={name} />
+      <input type="text" bind:value={name} placeholder={symptom.isFolder ? 'z.B. Körperlich' : 'z.B. Hitzewallungen'} />
     </label>
 
     <div class="field">
@@ -98,20 +129,26 @@
       </select>
     </div>
 
-    <button type="button" class="primary" onclick={save}>Speichern</button>
-    <button type="button" class="danger" onclick={startArchive}>Archivieren</button>
+    <button type="button" class="primary" onclick={save} disabled={!name.trim()}>
+      {isNew ? 'Anlegen' : 'Speichern'}
+    </button>
+    {#if !isNew}
+      <button type="button" class="danger" onclick={startArchive}>Archivieren</button>
+    {/if}
   {/if}
 </Modal>
 
-<ConfirmModal
-  open={archiveConfirm}
-  title={symptom.isFolder ? 'Ordner archivieren?' : 'Symptom archivieren?'}
-  message={`„${symptom.name}" wird ausgeblendet. Vorhandene Einträge bleiben erhalten.`}
-  confirmLabel="Archivieren"
-  danger
-  onConfirm={doArchive}
-  onCancel={() => (archiveConfirm = false)}
-/>
+{#if !isNew}
+  <ConfirmModal
+    open={archiveConfirm}
+    title={symptom.isFolder ? 'Ordner archivieren?' : 'Symptom archivieren?'}
+    message={`„${symptom.name}" wird ausgeblendet. Vorhandene Einträge bleiben erhalten.`}
+    confirmLabel="Archivieren"
+    danger
+    onConfirm={doArchive}
+    onCancel={() => (archiveConfirm = false)}
+  />
+{/if}
 
 <style>
   .preview { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); }
@@ -125,6 +162,7 @@
   .chip.on { background: var(--c-primary); color: var(--c-primary-contrast); border-color: var(--c-primary); }
   .muted { color: var(--c-text-dim); font-size: var(--fs-sm); }
   .primary { width: 100%; background: var(--c-primary); color: var(--c-primary-contrast); border: 0; padding: var(--sp-3); border-radius: var(--r-2); font-weight: var(--fw-bold); cursor: pointer; }
+  .primary[disabled] { opacity: 0.4; cursor: not-allowed; }
   .danger { display: block; margin: var(--sp-3) auto 0; color: var(--c-danger); background: none; border: 0; cursor: pointer; }
   .link { background: none; border: 0; color: var(--c-text-dim); cursor: pointer; }
 </style>
