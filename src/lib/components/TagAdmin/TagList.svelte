@@ -3,23 +3,48 @@
   import { listTags, createTag, renameTag, deleteTag, countSymptomsUsingTag } from '$lib/db/tags';
   import type { Tag } from '$lib/db';
   import { Plus, Pencil, Trash2 } from '@lucide/svelte';
+  import PromptModal from '$lib/components/ui/PromptModal.svelte';
+  import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 
   const tagsQ = liveQuery(() => listTags(), [] as Tag[]);
   $effect(() => () => tagsQ.dispose());
 
-  async function add() {
-    const name = prompt('Tag-Name?');
-    if (name) await createTag(name);
+  let promptState = $state<
+    | { kind: 'add' }
+    | { kind: 'rename'; tag: Tag }
+    | null
+  >(null);
+  let confirmState = $state<{ tag: Tag; message: string } | null>(null);
+
+  function add() {
+    promptState = { kind: 'add' };
   }
-  async function rename(t: Tag) {
-    const n = prompt('Neuer Name?', t.name);
-    if (n) await renameTag(t.id, n);
+  function startRename(t: Tag) {
+    promptState = { kind: 'rename', tag: t };
   }
-  async function remove(t: Tag) {
+  async function onPromptSubmit(value: string) {
+    const s = promptState;
+    promptState = null;
+    if (!s) return;
+    if (s.kind === 'add') {
+      await createTag(value);
+    } else {
+      await renameTag(s.tag.id, value);
+    }
+  }
+
+  async function startRemove(t: Tag) {
     const n = await countSymptomsUsingTag(t.id);
-    if (n > 0 && !confirm(`Tag "${t.name}" wird von ${n} Symptomen entfernt. Trotzdem löschen?`)) return;
-    if (n === 0 && !confirm(`Tag "${t.name}" löschen?`)) return;
-    await deleteTag(t.id);
+    const message =
+      n > 0
+        ? `Tag „${t.name}" wird von ${n} Symptom${n === 1 ? '' : 'en'} entfernt. Trotzdem löschen?`
+        : `Tag „${t.name}" wirklich löschen?`;
+    confirmState = { tag: t, message };
+  }
+  async function onConfirmRemove() {
+    const s = confirmState;
+    confirmState = null;
+    if (s) await deleteTag(s.tag.id);
   }
 </script>
 
@@ -32,12 +57,32 @@
   {#each tagsQ.current as t (t.id)}
     <li class="row">
       <span class="name">{t.name}</span>
-      <button type="button" onclick={() => rename(t)} aria-label="Umbenennen"><Pencil size={16} /></button>
-      <button type="button" onclick={() => remove(t)} aria-label="Löschen"><Trash2 size={16} /></button>
+      <button type="button" onclick={() => startRename(t)} aria-label="Umbenennen"><Pencil size={16} /></button>
+      <button type="button" onclick={() => startRemove(t)} aria-label="Löschen"><Trash2 size={16} /></button>
     </li>
   {/each}
   {#if tagsQ.current.length === 0}<li class="empty">Keine Tags vorhanden.</li>{/if}
 </ul>
+
+<PromptModal
+  open={promptState !== null}
+  title={promptState?.kind === 'rename' ? 'Tag umbenennen' : 'Neuer Tag'}
+  label="Name"
+  placeholder="z.B. körperlich"
+  initialValue={promptState?.kind === 'rename' ? promptState.tag.name : ''}
+  onSubmit={onPromptSubmit}
+  onCancel={() => (promptState = null)}
+/>
+
+<ConfirmModal
+  open={confirmState !== null}
+  title="Tag löschen?"
+  message={confirmState?.message ?? ''}
+  confirmLabel="Löschen"
+  danger
+  onConfirm={onConfirmRemove}
+  onCancel={() => (confirmState = null)}
+/>
 
 <style>
   .bar { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-4); border-bottom: 1px solid var(--c-border); }

@@ -7,6 +7,15 @@
     const v = (e.target as HTMLInputElement).value;
     if (v) currentDate.set(v);
   }
+  function openPicker(e: MouseEvent) {
+    // Native <input type="date"> opens the picker only on direct click of its
+    // internal calendar control. Our input is opacity:0, so without an explicit
+    // showPicker() call the click only moves focus and looks broken.
+    const el = e.currentTarget as HTMLInputElement;
+    if (typeof el.showPicker === 'function') {
+      try { el.showPicker(); } catch { /* needs a user gesture; we have one */ }
+    }
+  }
   const isToday = $derived(currentDate.value === todayKey());
 </script>
 
@@ -19,7 +28,12 @@
     <div class="date">{formatLong(currentDate.value)}</div>
     <label class="picker">
       <Calendar size={14} /> Datum wählen
-      <input type="date" value={currentDate.value} oninput={onPickerChange} />
+      <input
+        type="date"
+        value={currentDate.value}
+        oninput={onPickerChange}
+        onclick={openPicker}
+      />
     </label>
   </div>
   <button class="nav-btn" type="button" aria-label="Nächster Tag" onclick={() => currentDate.next()}>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import Badge from '$lib/components/ui/Badge.svelte';
   import SymptomEditModal from './SymptomEditModal.svelte';
+  import PromptModal from '$lib/components/ui/PromptModal.svelte';
   import { ChevronDown, ChevronRight, Plus } from '@lucide/svelte';
   import { listTree, createSymptom, reorderSiblings, type TreeNode } from '$lib/db/symptoms';
   import { liveQuery } from '$lib/stores/liveQuery.svelte';
@@ -13,6 +14,7 @@
   let expanded = $state(new Set<string>());
   let editing = $state<Symptom | null>(null);
   let reorderMode = $state(false);
+  let addPrompt = $state<{ isFolder: boolean } | null>(null);
 
   function toggle(id: string) {
     if (expanded.has(id)) expanded.delete(id);
@@ -20,10 +22,13 @@
     expanded = new Set(expanded);
   }
 
-  async function addRoot(isFolder: boolean) {
-    const name = prompt(isFolder ? 'Name des neuen Ordners?' : 'Name des neuen Symptoms?');
-    if (!name) return;
-    await createSymptom({ name, isFolder });
+  function startAdd(isFolder: boolean) {
+    addPrompt = { isFolder };
+  }
+  async function onAddSubmit(name: string) {
+    const s = addPrompt;
+    addPrompt = null;
+    if (s) await createSymptom({ name, isFolder: s.isFolder });
   }
 
   function handleConsider(_parentId: string | null, _e: CustomEvent<DndEvent<TreeNode>>) {
@@ -39,8 +44,8 @@
 <header class="bar">
   <h1>Symptome</h1>
   <div class="actions">
-    <button type="button" onclick={() => addRoot(false)}><Plus size={16} /> Symptom</button>
-    <button type="button" onclick={() => addRoot(true)}><Plus size={16} /> Ordner</button>
+    <button type="button" onclick={() => startAdd(false)}><Plus size={16} /> Symptom</button>
+    <button type="button" onclick={() => startAdd(true)}><Plus size={16} /> Ordner</button>
     <button type="button" onclick={() => reorderMode = !reorderMode}>
       {reorderMode ? 'Fertig' : 'Umsortieren'}
     </button>
@@ -79,6 +84,15 @@
 {#if editing}
   <SymptomEditModal open={true} symptom={editing} onClose={() => editing = null} />
 {/if}
+
+<PromptModal
+  open={addPrompt !== null}
+  title={addPrompt?.isFolder ? 'Neuer Ordner' : 'Neues Symptom'}
+  label="Name"
+  placeholder={addPrompt?.isFolder ? 'z.B. Körperlich' : 'z.B. Hitzewallungen'}
+  onSubmit={onAddSubmit}
+  onCancel={() => (addPrompt = null)}
+/>
 
 <style>
   .bar { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-4); border-bottom: 1px solid var(--c-border); }

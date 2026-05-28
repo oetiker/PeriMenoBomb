@@ -3,6 +3,7 @@
   import Badge from '$lib/components/ui/Badge.svelte';
   import ColorPicker from '$lib/components/ui/ColorPicker.svelte';
   import IconPicker from '$lib/components/ui/IconPicker.svelte';
+  import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
   import { updateSymptom, archiveSymptom, moveSymptom, listAllSymptoms } from '$lib/db/symptoms';
   import { liveQuery } from '$lib/stores/liveQuery.svelte';
   import { db, type Symptom, type Tag } from '$lib/db';
@@ -39,8 +40,13 @@
     onClose();
   }
 
-  async function archive() {
-    if (!confirm(`"${symptom.name}" archivieren?`)) return;
+  let archiveConfirm = $state(false);
+
+  function startArchive() {
+    archiveConfirm = true;
+  }
+  async function doArchive() {
+    archiveConfirm = false;
     await archiveSymptom(symptom.id);
     onClose();
   }
@@ -93,9 +99,19 @@
     </div>
 
     <button type="button" class="primary" onclick={save}>Speichern</button>
-    <button type="button" class="danger" onclick={archive}>Archivieren</button>
+    <button type="button" class="danger" onclick={startArchive}>Archivieren</button>
   {/if}
 </Modal>
+
+<ConfirmModal
+  open={archiveConfirm}
+  title={symptom.isFolder ? 'Ordner archivieren?' : 'Symptom archivieren?'}
+  message={`„${symptom.name}" wird ausgeblendet. Vorhandene Einträge bleiben erhalten.`}
+  confirmLabel="Archivieren"
+  danger
+  onConfirm={doArchive}
+  onCancel={() => (archiveConfirm = false)}
+/>
 
 <style>
   .preview { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); }
