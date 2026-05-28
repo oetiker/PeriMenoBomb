@@ -10,6 +10,20 @@
 
   function close() { onClose?.(); }
 
+  // Track whether the pointer press started on the backdrop itself. Only then
+  // does a release on the backdrop count as a "click outside" — otherwise a
+  // drag that started inside (e.g. on the SliderInput's track) and ended on
+  // the backdrop would dismiss the dialog.
+  let pressedOnBackdrop = false;
+
+  function onBackdropPointerDown(e: PointerEvent) {
+    pressedOnBackdrop = e.target === e.currentTarget;
+  }
+  function onBackdropClick(e: MouseEvent) {
+    if (pressedOnBackdrop && e.target === e.currentTarget) close();
+    pressedOnBackdrop = false;
+  }
+
   $effect(() => {
     if (!open) return;
     function key(e: KeyboardEvent) { if (e.key === 'Escape') close(); }
@@ -22,7 +36,8 @@
   <div
     class="backdrop"
     role="presentation"
-    onclick={(e) => { if (e.target === e.currentTarget) close(); }}
+    onpointerdown={onBackdropPointerDown}
+    onclick={onBackdropClick}
   >
     <div class="sheet" role="dialog" aria-modal="true" aria-label={title} tabindex={-1}>
       <div class="handle"></div>
