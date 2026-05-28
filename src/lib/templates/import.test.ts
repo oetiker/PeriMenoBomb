@@ -29,4 +29,19 @@ describe('importTemplate', () => {
       expect(tags.some((t) => t.id === tid)).toBe(true);
     }
   });
+
+  it('imports inputs and daily from template', async () => {
+    await importTemplate({
+      tags: [],
+      roots: [
+        { name: 'Test', icon: 'circle', color: '#000',
+          inputs: { comment: { enabled: true, required: false } },
+          daily: true }
+      ]
+    });
+    const all = await db.symptoms.toArray();
+    expect(all).toHaveLength(1);
+    expect(all[0].daily).toBe(true);
+    expect(all[0].inputs.comment.enabled).toBe(true);
+  });
 });
