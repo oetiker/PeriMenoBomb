@@ -7,10 +7,21 @@
   type Props = { entry: Entry; symptom: Symptom; onTap: () => void; onSwipe: () => void };
   let { entry, symptom, onTap, onSwipe }: Props = $props();
 
-  // Transient stub — Task 13 replaces the status line with the new slider/number/comment-aware version.
-  const valueLabel = $derived(
-    entry.sliderValue !== null ? String(entry.sliderValue) : 'erfasst'
-  );
+  const sliderText = $derived.by(() => {
+    if (!symptom.inputs.slider.enabled) return '';
+    if (entry.sliderValue === null) return 'unspezifisch';
+    const low = symptom.inputs.slider.lowLabel || 'leicht';
+    const high = symptom.inputs.slider.highLabel || 'hoch';
+    return `${low} ··· ${entry.sliderValue} ··· ${high}`;
+  });
+
+  const numberText = $derived.by(() => {
+    if (!symptom.inputs.number.enabled || entry.numberValue === null) return '';
+    const unit = symptom.inputs.number.unit;
+    return unit ? `${entry.numberValue} ${unit}` : String(entry.numberValue);
+  });
+
+  const showComment = $derived(symptom.inputs.comment.enabled && entry.comment.trim().length > 0);
 </script>
 
 <SwipeRow {onSwipe}>
@@ -19,8 +30,10 @@
     <div class="text">
       <div class="name">{symptom.name}</div>
       <div class="meta">
-        <span class={`level level-${entry.sliderValue ?? 'none'}`}>{valueLabel}</span>
-        {#if entry.comment}<MessageCircle size={14} />{/if}
+        {#if sliderText}<span class="slider">{sliderText}</span>{/if}
+        {#if numberText}<span class="number">{numberText}</span>{/if}
+        {#if showComment}<MessageCircle size={14} />{/if}
+        {#if !sliderText && !numberText && !showComment}<span class="empty">erfasst</span>{/if}
       </div>
     </div>
   </button>
@@ -36,7 +49,8 @@
     margin-bottom: var(--sp-2);
     cursor: pointer; text-align: left;
   }
-  .text { flex: 1; }
+  .text { flex: 1; min-width: 0; }
   .name { font-weight: var(--fw-bold); }
-  .meta { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--c-text-dim); margin-top: 2px; }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--c-text-dim); margin-top: 2px; }
+  .empty { font-style: italic; }
 </style>
