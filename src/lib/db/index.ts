@@ -1,4 +1,4 @@
-import Dexie, { type Table } from 'dexie';
+import Dexie, { type Table, type Transaction } from 'dexie';
 
 export interface Symptom {
   id: string;
@@ -71,15 +71,17 @@ export class PeriMenoDB extends Dexie {
       tags:     'id, name',
       entries:  'id, date, symptomId, [date+symptomId]',
       meta:     'key'
-    }).upgrade(async (tx) => {
-      await tx.table('entries').clear();
-      await tx.table('symptoms').toCollection().modify((s: any) => {
-        if (!s.inputs) s.inputs = defaultSymptomInputs();
-        if (typeof s.daily !== 'boolean') s.daily = false;
-      });
-      await tx.table('meta').delete('openDialog');
-    });
+    }).upgrade(upgradeV1toV2);
   }
+}
+
+export async function upgradeV1toV2(tx: Transaction): Promise<void> {
+  await tx.table('entries').clear();
+  await tx.table('symptoms').toCollection().modify((s: Partial<Symptom>) => {
+    if (!s.inputs) s.inputs = defaultSymptomInputs();
+    if (typeof s.daily !== 'boolean') s.daily = false;
+  });
+  await tx.table('meta').delete('openDialog');
 }
 
 export const db = new PeriMenoDB();

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Dexie from 'dexie';
 import 'fake-indexeddb/auto';
-import { defaultSymptomInputs } from './index';
+import { defaultSymptomInputs, upgradeV1toV2 } from './index';
 
 const DB_NAME = 'perimenobomb-migrationtest';
 
@@ -53,14 +53,7 @@ describe('Dexie schema v1 → v2 upgrade', () => {
       tags:     'id, name',
       entries:  'id, date, symptomId, [date+symptomId]',
       meta:     'key'
-    }).upgrade(async (tx) => {
-      await tx.table('entries').clear();
-      await tx.table('symptoms').toCollection().modify((s: any) => {
-        if (!s.inputs) s.inputs = defaultSymptomInputs();
-        if (typeof s.daily !== 'boolean') s.daily = false;
-      });
-      await tx.table('meta').delete('openDialog');
-    });
+    }).upgrade(upgradeV1toV2);
     await v2.open();
 
     const entries = await v2.table('entries').toArray();
