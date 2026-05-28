@@ -2,74 +2,87 @@
   import { untrack } from 'svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
   import Badge from '$lib/components/ui/Badge.svelte';
-  import { upsertEntry, deleteEntry, getEntry } from '$lib/db/entries';
-  import { db, type Symptom } from '$lib/db';
-  import { snackbar } from '$lib/stores/snackbar.svelte';
+  import SliderInput from './SliderInput.svelte';
+  import NumberInput from './NumberInput.svelte';
+  import { upsertEntry, getEntry, validateEntry } from '$lib/db/entries';
+  import type { Symptom } from '$lib/db';
   import { isValidDateKey, formatLong } from '$lib/utils/date';
+  import {
+    persistDialog, updateDialogPayload, clearDialog
+  } from '$lib/stores/openDialog.svelte';
+  import { page } from '$app/state';
 
-  type Props = { open: boolean; date: string; symptom: Symptom; onClose: () => void };
-  let { open, date, symptom, onClose }: Props = $props();
+  type Props = {
+    open: boolean;
+    date: string;
+    symptom: Symptom;
+    /** Optional initial values when restoring from openDialog. */
+    initial?: { sliderValue: number | null; numberValue: number | null; comment: string };
+    onClose: () => void;
+  };
+  let { open, date, symptom, initial, onClose }: Props = $props();
 
-  // workingDate tracks the entry's current date. Moves the entry between dates
-  // when the user picks a new value.
   let workingDate = $state(untrack(() => date));
-  let sliderValue = $state<number | null>(null);
-  let numberValue = $state<number | null>(null);
-  let comment = $state('');
+  let sliderValue = $state<number | null>(untrack(() => initial?.sliderValue ?? null));
+  let numberValue = $state<number | null>(untrack(() => initial?.numberValue ?? null));
+  let comment = $state(untrack(() => initial?.comment ?? ''));
 
+  // Load existing entry once on open. If `initial` is provided (restore path), skip — restored values win.
   $effect(() => {
     if (!open) return;
     workingDate = date;
+    if (initial) return;
     (async () => {
       const e = await getEntry(date, symptom.id);
-      sliderValue = e?.sliderValue ?? null;
-      numberValue = e?.numberValue ?? null;
-      comment = e?.comment ?? '';
+      if (e) {
+        sliderValue = e.sliderValue;
+        numberValue = e.numberValue;
+        comment = e.comment;
+      } else {
+        sliderValue = null;
+        numberValue = null;
+        comment = '';
+      }
     })();
   });
 
-  async function onCommentBlur(e: FocusEvent) {
-    const v = (e.target as HTMLTextAreaElement).value;
-    comment = v;
-    await upsertEntry({ date: workingDate, symptomId: symptom.id, comment: v });
+  // Persist dialog on open; update on every change; clear on close paths.
+  $effect(() => {
+    if (!open) return;
+    void persistDialog({
+      kind: 'entry-editor',
+      route: page.url.pathname,
+      payload: { date: workingDate, symptomId: symptom.id, sliderValue, numberValue, comment }
+    });
+  });
+
+  $effect(() => {
+    if (!open) return;
+    void updateDialogPayload({ date: workingDate, sliderValue, numberValue, comment });
+  });
+
+  const validation = $derived(validateEntry(symptom, { sliderValue, numberValue, comment }));
+
+  async function onFertig() {
+    if (!validation.ok) return;
+    await upsertEntry({
+      date: workingDate,
+      symptomId: symptom.id,
+      sliderValue, numberValue, comment
+    });
+    await clearDialog();
+    onClose();
+  }
+
+  function onVerwerfen() {
+    void clearDialog();
+    onClose();
   }
 
   async function onDateChange(e: Event) {
     const v = (e.target as HTMLInputElement).value;
     if (!v || !isValidDateKey(v) || v === workingDate) return;
-    const oldDate = workingDate;
-    // Hoist captured values so the undo closure can reference them.
-    let carrySlider: number | null = null;
-    let carryNumber: number | null = null;
-    let carryComment = comment;
-    await db.transaction('rw', db.entries, async () => {
-      const existing = await getEntry(oldDate, symptom.id);
-      carrySlider = existing?.sliderValue ?? null;
-      carryNumber = existing?.numberValue ?? null;
-      carryComment = existing?.comment ?? comment;
-      await deleteEntry(oldDate, symptom.id);
-      await upsertEntry({
-        date: v,
-        symptomId: symptom.id,
-        sliderValue: carrySlider,
-        numberValue: carryNumber,
-        comment: carryComment
-      });
-    });
     workingDate = v;
-    snackbar.show({
-      message: `Eintrag nach ${formatLong(v)} verschoben`,
-      actionLabel: 'Rückgängig',
-      onAction: async () => {
-        await db.transaction('rw', db.entries, async () => {
-          await deleteEntry(v, symptom.id);
-          // Use the captured original values to avoid data loss on undo
-          // (Task 11 will rewrite the entire date-move flow).
-          await upsertEntry({ date: oldDate, symptomId: symptom.id, sliderValue: carrySlider, numberValue: carryNumber, comment: carryComment });
-        });
-        workingDate = oldDate;
-      }
-    });
   }
 
   function openDatePicker(e: MouseEvent) {
@@ -78,28 +91,9 @@
       try { el.showPicker(); } catch { /* needs a user gesture; we have one */ }
     }
   }
-
-  async function remove() {
-    await deleteEntry(workingDate, symptom.id);
-    const carry = { date: workingDate, comment };
-    snackbar.show({
-      message: `${symptom.name} entfernt`,
-      actionLabel: 'Rückgängig',
-      onAction: async () => {
-        await upsertEntry({
-          date: carry.date,
-          symptomId: symptom.id,
-          sliderValue: null,
-          numberValue: null,
-          comment: carry.comment
-        });
-      }
-    });
-    onClose();
-  }
 </script>
 
-<Modal {open} {onClose}>
+<Modal {open} onClose={onVerwerfen}>
   <div class="header">
     <Badge icon={symptom.icon} color={symptom.color} size={36} />
     <h3>{symptom.name}</h3>
@@ -109,50 +103,70 @@
     <div class="caption">Datum</div>
     <label class="date-row">
       <span class="date-label">{formatLong(workingDate)}</span>
-      <input
-        type="date"
-        value={workingDate}
-        oninput={onDateChange}
-        onclick={openDatePicker}
-        aria-label="Datum ändern"
-      />
+      <input type="date" value={workingDate} oninput={onDateChange} onclick={openDatePicker} aria-label="Datum ändern" />
     </label>
   </section>
 
-  <section>
-    <div class="caption">Kommentar (optional)</div>
-    <textarea
-      class="comment"
-      placeholder="z.B. Auslöser, Umstände…"
-      bind:value={comment}
-      onblur={onCommentBlur}
-      rows={3}
-    ></textarea>
-  </section>
+  {#if symptom.inputs.slider.enabled}
+    <section>
+      <div class="caption">
+        Intensität
+        {#if symptom.inputs.slider.required}<span class="req">*</span>{/if}
+      </div>
+      <SliderInput
+        value={sliderValue}
+        lowLabel={symptom.inputs.slider.lowLabel}
+        highLabel={symptom.inputs.slider.highLabel}
+        onChange={(v) => (sliderValue = v)}
+      />
+    </section>
+  {/if}
 
-  <button type="button" class="primary" onclick={onClose}>Fertig</button>
-  <button type="button" class="danger" onclick={remove}>🗑 Eintrag entfernen</button>
+  {#if symptom.inputs.number.enabled}
+    <section>
+      <div class="caption">
+        Anzahl
+        {#if symptom.inputs.number.required}<span class="req">*</span>{/if}
+      </div>
+      <NumberInput
+        value={numberValue}
+        unit={symptom.inputs.number.unit}
+        integer={symptom.inputs.number.integer}
+        onChange={(v) => (numberValue = v)}
+      />
+    </section>
+  {/if}
+
+  {#if symptom.inputs.comment.enabled}
+    <section>
+      <div class="caption">
+        Kommentar
+        {#if symptom.inputs.comment.required}<span class="req">*</span>{/if}
+      </div>
+      <textarea class="comment" rows={3} placeholder="z.B. Auslöser, Umstände…" bind:value={comment}></textarea>
+    </section>
+  {/if}
+
+  <button type="button" class="primary" onclick={onFertig} disabled={!validation.ok}>Fertig</button>
+  <button type="button" class="discard" onclick={onVerwerfen}>Verwerfen</button>
 </Modal>
 
 <style>
   .header { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); }
   .header h3 { margin: 0; font-size: var(--fs-lg); }
   .caption { font-size: var(--fs-xs); color: var(--c-text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--sp-2); }
-  .comment { width: 100%; padding: var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--r-2); resize: vertical; font: inherit; box-sizing: border-box; }
+  .req { color: var(--c-danger); margin-left: 4px; }
   section { margin-bottom: var(--sp-4); }
+  .comment { width: 100%; padding: var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--r-2); resize: vertical; font: inherit; box-sizing: border-box; }
   .primary { width: 100%; background: var(--c-primary); color: var(--c-primary-contrast); border: 0; padding: var(--sp-3); border-radius: var(--r-2); font-weight: var(--fw-bold); cursor: pointer; }
-  .danger { display: block; margin: var(--sp-3) auto 0; color: var(--c-danger); background: none; border: 0; cursor: pointer; }
-
+  .primary[disabled] { opacity: 0.4; cursor: not-allowed; }
+  .discard { display: block; margin: var(--sp-3) auto 0; color: var(--c-danger); background: none; border: 0; cursor: pointer; }
   .date-row {
     display: inline-flex; align-items: center; gap: var(--sp-2);
     padding: var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--r-2);
     position: relative; cursor: pointer; width: 100%; box-sizing: border-box;
   }
-  .date-row::after {
-    content: '📅'; margin-left: auto; opacity: 0.7;
-  }
-  .date-row input[type="date"] {
-    position: absolute; inset: 0; opacity: 0; cursor: pointer;
-  }
+  .date-row::after { content: '📅'; margin-left: auto; opacity: 0.7; }
+  .date-row input[type="date"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
   .date-label { font-weight: var(--fw-medium); }
 </style>
