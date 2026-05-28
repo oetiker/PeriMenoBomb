@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
   import Badge from '$lib/components/ui/Badge.svelte';
   import { upsertEntry, deleteEntry, getEntry } from '$lib/db/entries';
@@ -11,7 +12,7 @@
 
   // workingDate tracks the entry's current date. Moves the entry between dates
   // when the user picks a new value.
-  let workingDate = $state(date);
+  let workingDate = $state(untrack(() => date));
   let intensity = $state<Intensity>(null);
   let comment = $state('');
 

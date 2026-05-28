@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   type Props = { value: string; onChange: (color: string) => void };
   let { value, onChange }: Props = $props();
 
@@ -7,7 +8,7 @@
     '#84cc16','#10b981','#06b6d4','#3b82f6',
     '#6366f1','#8b5cf6','#ec4899','#6b7280'
   ];
-  let custom = $state(value && !PALETTE.includes(value) ? value : '');
+  let custom = $state(untrack(() => value && !PALETTE.includes(value) ? value : ''));
 
   function pick(c: string) {
     onChange(c);

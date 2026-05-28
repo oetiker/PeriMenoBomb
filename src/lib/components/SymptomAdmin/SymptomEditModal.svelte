@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
   import Badge from '$lib/components/ui/Badge.svelte';
   import ColorPicker from '$lib/components/ui/ColorPicker.svelte';
@@ -22,11 +23,11 @@
   };
   let { open, symptom, isNew = false, onClose }: Props = $props();
 
-  let name = $state(symptom.name);
-  let color = $state(symptom.color);
-  let icon = $state(symptom.icon);
-  let tagIds = $state([...symptom.tagIds]);
-  let parentId = $state<string | null>(symptom.parentId);
+  let name = $state(untrack(() => symptom.name));
+  let color = $state(untrack(() => symptom.color));
+  let icon = $state(untrack(() => symptom.icon));
+  let tagIds = $state(untrack(() => [...symptom.tagIds]));
+  let parentId = $state<string | null>(untrack(() => symptom.parentId));
   let view = $state<'main' | 'icons'>('main');
 
   $effect(() => {

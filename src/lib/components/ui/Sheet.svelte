@@ -9,11 +9,22 @@
     children: Snippet;
   };
   let { open, title, canGoBack = false, onBack, onClose, children }: Props = $props();
+
+  $effect(() => {
+    if (!open) return;
+    function key(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  });
 </script>
 
 {#if open}
-  <div class="backdrop" onclick={onClose} role="presentation">
-    <div class="sheet" role="dialog" aria-modal="true" aria-label={title} onclick={(e) => e.stopPropagation()}>
+  <div
+    class="backdrop"
+    role="presentation"
+    onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+  >
+    <div class="sheet" role="dialog" aria-modal="true" aria-label={title} tabindex={-1}>
       <div class="handle"></div>
       <header>
         {#if canGoBack}

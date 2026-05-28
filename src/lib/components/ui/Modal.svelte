@@ -19,8 +19,12 @@
 </script>
 
 {#if open}
-  <div class="backdrop" onclick={close} role="presentation">
-    <div class="sheet" role="dialog" aria-modal="true" aria-label={title} onclick={(e) => e.stopPropagation()}>
+  <div
+    class="backdrop"
+    role="presentation"
+    onclick={(e) => { if (e.target === e.currentTarget) close(); }}
+  >
+    <div class="sheet" role="dialog" aria-modal="true" aria-label={title} tabindex={-1}>
       <div class="handle"></div>
       {#if title}<h2 class="title">{title}</h2>{/if}
       <div class="body">{@render children()}</div>

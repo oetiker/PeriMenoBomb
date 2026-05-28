@@ -26,6 +26,7 @@
 
 <div
   class="swipe-row"
+  role="presentation"
   ontouchstart={onStart}
   ontouchmove={onMove}
   ontouchend={onEnd}

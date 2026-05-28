@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import Modal from './Modal.svelte';
 
   type Props = {
@@ -23,7 +24,7 @@
     onCancel
   }: Props = $props();
 
-  let value = $state(initialValue);
+  let value = $state(untrack(() => initialValue));
   let inputEl: HTMLInputElement | undefined = $state();
 
   $effect(() => {
