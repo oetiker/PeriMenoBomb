@@ -3,6 +3,9 @@
   import BottomNav from '$lib/components/ui/BottomNav.svelte';
   import Snackbar from '$lib/components/ui/Snackbar.svelte';
   import { snackbar } from '$lib/stores/snackbar.svelte';
+  import { loadOpenDialog, pendingRestore } from '$lib/stores/openDialog.svelte';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { onMount } from 'svelte';
   let { children } = $props();
 
@@ -20,6 +23,16 @@
         });
       }
     });
+
+    // Open-Dialog-Restore: nach Cold-Start zur gespeicherten Route navigieren
+    // und pendingRestore setzen, damit die Zielseite den Dialog wieder öffnet.
+    const open = await loadOpenDialog();
+    if (open) {
+      if (open.route !== page.url.pathname) {
+        await goto(open.route, { replaceState: true });
+      }
+      pendingRestore.set(open);
+    }
   });
 </script>
 

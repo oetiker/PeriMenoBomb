@@ -13,6 +13,7 @@
   } from '$lib/db/symptoms';
   import { liveQuery } from '$lib/stores/liveQuery.svelte';
   import { snackbar } from '$lib/stores/snackbar.svelte';
+  import { pendingRestore } from '$lib/stores/openDialog.svelte';
   import { type Symptom, defaultSymptomInputs } from '$lib/db';
 
   const treeQ = liveQuery(() => listTree(), [] as TreeNode[]);
@@ -21,6 +22,68 @@
   let expanded = $state(new Set<string>());
   let editing = $state<{ symptom: Symptom; isNew: boolean } | null>(null);
   let localTree = $state<TreeNode[]>([]);
+
+  // Cold-Start-Restore: wartet auf den Tree (für bestehende Symptome müssen wir
+  // die Node auflösen), konsumiert dann einen evtl. wartenden symptom-edit-
+  // Restore und öffnet den Editor mit dem persistierten Payload.
+  // Hinweis: Für isNew-Restores wäre der Tree theoretisch nicht nötig; das
+  // Warten verzögert den new-Restore um einen Tick, was in der Praxis irrelevant
+  // ist, hält die Logik aber einheitlich (ein gemeinsamer Konsum-Pfad).
+  $effect.pre(() => {
+    if (editing !== null) return;
+    if (treeQ.current.length === 0) return;
+    const r = pendingRestore.consume('symptom-edit');
+    if (!r) return;
+
+    if (r.payload.symptomId) {
+      const find = (nodes: TreeNode[]): Symptom | null => {
+        for (const n of nodes) {
+          if (n.id === r.payload.symptomId) {
+            const { children: _c, ...plain } = n;
+            return plain as Symptom;
+          }
+          const sub = find(n.children);
+          if (sub) return sub;
+        }
+        return null;
+      };
+      const sym = find(treeQ.current);
+      if (!sym) return; // archiviert/gelöscht — stillschweigend überspringen
+      editing = {
+        symptom: {
+          ...sym,
+          name: r.payload.name,
+          color: r.payload.color,
+          icon: r.payload.icon,
+          tagIds: r.payload.tagIds,
+          parentId: r.payload.parentId,
+          inputs: r.payload.inputs,
+          daily: r.payload.daily
+        },
+        isNew: false
+      };
+    } else if (r.payload.isNew) {
+      editing = {
+        symptom: {
+          id: '',
+          name: r.payload.name,
+          color: r.payload.color,
+          icon: r.payload.icon,
+          tagIds: r.payload.tagIds,
+          parentId: r.payload.parentId,
+          sortIndex: 0,
+          depth: 0,
+          isFolder: r.payload.isFolder,
+          archived: false,
+          createdAt: 0,
+          updatedAt: 0,
+          inputs: r.payload.inputs,
+          daily: r.payload.daily
+        } as Symptom,
+        isNew: true
+      };
+    }
+  });
 
   type DragState = {
     id: string;

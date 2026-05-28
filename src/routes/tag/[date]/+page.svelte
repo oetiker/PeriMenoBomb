@@ -10,12 +10,17 @@
   import { db, type Symptom, type Entry } from '$lib/db';
   import { listEntriesForDate } from '$lib/db/entries';
   import { getOrDefault } from '$lib/db/meta';
+  import { pendingRestore } from '$lib/stores/openDialog.svelte';
 
   let { data } = $props();
   $effect(() => { currentDate.set(data.date); });
 
   let sheetOpen = $state(false);
   let editing = $state<{ symptom: Symptom } | null>(null);
+  let restoreInitial = $state<
+    | { sliderValue: number | null; numberValue: number | null; comment: string; workingDate: string }
+    | null
+  >(null);
 
   const firstRunQ = liveQuery(async () => await getOrDefault('firstRunCompleted', false), false);
   $effect(() => () => firstRunQ.dispose());
@@ -33,6 +38,24 @@
     const sym = symptomsQ.current.find((s) => s.id === symptomId);
     if (sym) editing = { symptom: sym };
   }
+
+  // Cold-Start-Restore: sobald die Symptome geladen sind, prüfen wir, ob ein
+  // entry-editor-Restore wartet. Erst dann konsumieren, damit der symptomId-
+  // Lookup gelingt; sonst würden wir den Restore-Eintrag zu früh verbrauchen.
+  $effect.pre(() => {
+    if (symptomsQ.current.length === 0) return;
+    const r = pendingRestore.consume('entry-editor');
+    if (!r) return;
+    const sym = symptomsQ.current.find((s) => s.id === r.payload.symptomId);
+    if (!sym) return; // Symptom inzwischen archiviert/gelöscht — stillschweigend überspringen
+    editing = { symptom: sym };
+    restoreInitial = {
+      sliderValue: r.payload.sliderValue,
+      numberValue: r.payload.numberValue,
+      comment: r.payload.comment,
+      workingDate: r.payload.date
+    };
+  });
 </script>
 
 {#if !firstRunQ.current}
@@ -46,6 +69,14 @@
   <SymptomSheet open={sheetOpen} onClose={() => sheetOpen = false} {onPick} {enteredIds} />
 
   {#if editing}
-    <EntryEditor open={true} date={currentDate.value} symptom={editing.symptom} onClose={() => editing = null} />
+    <EntryEditor
+      open={true}
+      date={restoreInitial?.workingDate ?? currentDate.value}
+      symptom={editing.symptom}
+      initial={restoreInitial
+        ? { sliderValue: restoreInitial.sliderValue, numberValue: restoreInitial.numberValue, comment: restoreInitial.comment }
+        : undefined}
+      onClose={() => { editing = null; restoreInitial = null; }}
+    />
   {/if}
 {/if}
