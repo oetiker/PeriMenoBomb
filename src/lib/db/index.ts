@@ -66,6 +66,19 @@ export class PeriMenoDB extends Dexie {
       entries: 'id, date, symptomId, [date+symptomId]',
       meta: 'key'
     });
+    this.version(2).stores({
+      symptoms: 'id, parentId, [parentId+sortIndex], archived',
+      tags:     'id, name',
+      entries:  'id, date, symptomId, [date+symptomId]',
+      meta:     'key'
+    }).upgrade(async (tx) => {
+      await tx.table('entries').clear();
+      await tx.table('symptoms').toCollection().modify((s: any) => {
+        if (!s.inputs) s.inputs = defaultSymptomInputs();
+        if (typeof s.daily !== 'boolean') s.daily = false;
+      });
+      await tx.table('meta').delete('openDialog');
+    });
   }
 }
 
