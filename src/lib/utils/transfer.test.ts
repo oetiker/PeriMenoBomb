@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetDatabase, db } from '$lib/db';
+import { resetDatabase, db, defaultSymptomInputs } from '$lib/db';
 import { exportAll, importAll, validateExportPayload } from './transfer';
 
 describe('transfer', () => {
@@ -7,7 +7,7 @@ describe('transfer', () => {
 
   it('round-trips an export through import', async () => {
     await db.tags.add({ id: 't1', name: 'körperlich', createdAt: 1 });
-    await db.symptoms.add({ id: 's1', name: 'A', color: '#000', icon: 'circle', tagIds: ['t1'], parentId: null, sortIndex: 0, depth: 0, isFolder: false, archived: false, createdAt: 1, updatedAt: 1 });
+    await db.symptoms.add({ id: 's1', name: 'A', color: '#000', icon: 'circle', tagIds: ['t1'], parentId: null, sortIndex: 0, depth: 0, isFolder: false, archived: false, createdAt: 1, updatedAt: 1, inputs: defaultSymptomInputs(), daily: false });
     await db.entries.add({ id: '2026-05-27__s1', date: '2026-05-27', symptomId: 's1', intensity: 'mittel', comment: '', updatedAt: 1 });
 
     const payload = await exportAll();

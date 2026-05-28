@@ -13,12 +13,28 @@ export interface Symptom {
   archived: boolean;
   createdAt: number;
   updatedAt: number;
+  inputs:    SymptomInputs;
+  daily:     boolean;
 }
 
 export interface Tag {
   id: string;
   name: string;
   createdAt: number;
+}
+
+export interface SymptomInputs {
+  slider:  { enabled: boolean; required: boolean; lowLabel: string; highLabel: string };
+  number:  { enabled: boolean; required: boolean; unit: string; integer: boolean };
+  comment: { enabled: boolean; required: boolean };
+}
+
+export function defaultSymptomInputs(): SymptomInputs {
+  return {
+    slider:  { enabled: false, required: false, lowLabel: '', highLabel: '' },
+    number:  { enabled: false, required: false, unit: '', integer: true },
+    comment: { enabled: false, required: false }
+  };
 }
 
 export type Intensity = 'leicht' | 'mittel' | 'stark' | null;

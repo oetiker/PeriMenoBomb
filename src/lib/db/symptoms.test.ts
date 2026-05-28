@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetDatabase, db } from './index';
+import { resetDatabase, db, defaultSymptomInputs } from './index';
 import { createSymptom, updateSymptom, getSymptom, archiveSymptom, listAllSymptoms, listChildren } from './symptoms';
 import { moveSymptom, reorderSiblings, subtreeDepth, listTree } from './symptoms';
 
@@ -66,6 +66,12 @@ describe('symptoms CRUD', () => {
     await db.symptoms.update(b.id, { sortIndex: 1 });
     const kids = await listChildren(root.id);
     expect(kids.map((k) => k.name)).toEqual(['A', 'B']);
+  });
+
+  it('createSymptom sets default inputs and daily=false', async () => {
+    const s = await createSymptom({ name: 'Test' });
+    expect(s.inputs).toEqual(defaultSymptomInputs());
+    expect(s.daily).toBe(false);
   });
 });
 

@@ -1,4 +1,4 @@
-import { db, type Symptom } from './index';
+import { db, type Symptom, defaultSymptomInputs } from './index';
 import { newId } from '$lib/utils/uuid';
 
 export interface CreateSymptomInput {
@@ -46,7 +46,9 @@ export async function createSymptom(input: CreateSymptomInput): Promise<Symptom>
     isFolder,
     archived: false,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    inputs: defaultSymptomInputs(),
+    daily: false
   };
   await db.symptoms.add(sym);
   return sym;

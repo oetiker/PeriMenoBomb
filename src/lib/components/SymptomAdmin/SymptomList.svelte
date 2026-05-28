@@ -13,7 +13,7 @@
   } from '$lib/db/symptoms';
   import { liveQuery } from '$lib/stores/liveQuery.svelte';
   import { snackbar } from '$lib/stores/snackbar.svelte';
-  import type { Symptom } from '$lib/db';
+  import { type Symptom, defaultSymptomInputs } from '$lib/db';
 
   const treeQ = liveQuery(() => listTree(), [] as TreeNode[]);
   $effect(() => () => treeQ.dispose());
@@ -415,7 +415,9 @@
       isFolder,
       archived: false,
       createdAt: 0,
-      updatedAt: 0
+      updatedAt: 0,
+      inputs: defaultSymptomInputs(),
+      daily: false
     };
     editing = { symptom: draft, isNew: true };
   }
