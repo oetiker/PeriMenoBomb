@@ -5,6 +5,7 @@
   import ColorPicker from '$lib/components/ui/ColorPicker.svelte';
   import IconPicker from '$lib/components/ui/IconPicker.svelte';
   import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
+  import InputConfigSection from './InputConfigSection.svelte';
   import {
     createSymptom,
     updateSymptom,
@@ -13,7 +14,7 @@
     listAllSymptoms
   } from '$lib/db/symptoms';
   import { liveQuery } from '$lib/stores/liveQuery.svelte';
-  import { db, type Symptom, type Tag } from '$lib/db';
+  import { db, type Symptom, type Tag, defaultSymptomInputs, type SymptomInputs } from '$lib/db';
 
   type Props = {
     open: boolean;
@@ -28,6 +29,8 @@
   let icon = $state(untrack(() => symptom.icon));
   let tagIds = $state(untrack(() => [...symptom.tagIds]));
   let parentId = $state<string | null>(untrack(() => symptom.parentId));
+  let inputs = $state<SymptomInputs>(untrack(() => symptom.inputs ?? defaultSymptomInputs()));
+  let daily = $state(untrack(() => symptom.daily ?? false));
   let view = $state<'main' | 'icons'>('main');
 
   $effect(() => {
@@ -36,6 +39,8 @@
     icon = symptom.icon;
     tagIds = [...symptom.tagIds];
     parentId = symptom.parentId;
+    inputs = symptom.inputs ?? defaultSymptomInputs();
+    daily = symptom.daily ?? false;
     view = 'main';
   });
 
@@ -51,6 +56,7 @@
     const trimmedName = name.trim();
     if (!trimmedName) return;
     const snapTags = $state.snapshot(tagIds);
+    const snapInputs = $state.snapshot(inputs) as SymptomInputs;
     if (isNew) {
       await createSymptom({
         name: trimmedName,
@@ -58,10 +64,12 @@
         parentId,
         color,
         icon,
-        tagIds: snapTags
+        tagIds: snapTags,
+        inputs: snapInputs,
+        daily
       });
     } else {
-      await updateSymptom(symptom.id, { name: trimmedName, color, icon, tagIds: snapTags });
+      await updateSymptom(symptom.id, { name: trimmedName, color, icon, tagIds: snapTags, inputs: snapInputs, daily });
       if (parentId !== symptom.parentId) {
         await moveSymptom(symptom.id, parentId);
       }
@@ -129,6 +137,15 @@
         {/each}
       </select>
     </div>
+
+    {#if !symptom.isFolder}
+      <InputConfigSection
+        {inputs}
+        {daily}
+        onInputsChange={(n) => (inputs = n)}
+        onDailyChange={(n) => (daily = n)}
+      />
+    {/if}
 
     <button type="button" class="primary" onclick={save} disabled={!name.trim()}>
       {isNew ? 'Anlegen' : 'Speichern'}

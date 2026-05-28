@@ -8,6 +8,8 @@ export interface CreateSymptomInput {
   color?: string;
   icon?: string;
   tagIds?: string[];
+  inputs?: SymptomInputs;
+  daily?: boolean;
 }
 
 export const DEFAULT_COLOR = '#6b7280';
@@ -47,8 +49,8 @@ export async function createSymptom(input: CreateSymptomInput): Promise<Symptom>
     archived: false,
     createdAt: now,
     updatedAt: now,
-    inputs: defaultSymptomInputs(),
-    daily: false
+    inputs: input.inputs ?? defaultSymptomInputs(),
+    daily: input.daily ?? false
   };
   await db.symptoms.add(sym);
   return sym;
