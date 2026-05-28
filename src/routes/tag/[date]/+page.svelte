@@ -8,7 +8,7 @@
   import { currentDate } from '$lib/stores/currentDate.svelte';
   import { liveQuery, liveQueryEffect } from '$lib/stores/liveQuery.svelte';
   import { db, type Symptom, type Entry } from '$lib/db';
-  import { listEntriesForDate, upsertEntry } from '$lib/db/entries';
+  import { listEntriesForDate } from '$lib/db/entries';
   import { getOrDefault } from '$lib/db/meta';
 
   let { data } = $props();
@@ -29,8 +29,7 @@
 
   const enteredIds = $derived(new Set(entriesQ.current.map((e) => e.symptomId)));
 
-  async function onPick(symptomId: string) {
-    await upsertEntry({ date: currentDate.value, symptomId });
+  function onPick(symptomId: string) {
     const sym = symptomsQ.current.find((s) => s.id === symptomId);
     if (sym) editing = { symptom: sym };
   }

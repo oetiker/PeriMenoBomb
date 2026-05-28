@@ -12,10 +12,10 @@ describe('snackbar store', () => {
     expect(snackbar.current).toBeNull();
   });
 
-  it('action callback fires on tap and dismisses', () => {
+  it('action callback fires on tap and dismisses', async () => {
     let undone = 0;
     snackbar.show({ message: 'X', actionLabel: 'Rückgängig', onAction: () => { undone++; } });
-    snackbar.invokeAction();
+    await snackbar.invokeAction();
     expect(undone).toBe(1);
     expect(snackbar.current).toBeNull();
   });

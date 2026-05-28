@@ -1,7 +1,7 @@
 export interface SnackbarSpec {
   message: string;
   actionLabel?: string;
-  onAction?: () => void;
+  onAction?: () => void | Promise<void>;
   durationMs?: number;
 }
 
@@ -28,10 +28,13 @@ export const snackbar = {
     clearTimer();
     current = null;
   },
-  invokeAction() {
+  async invokeAction() {
     const c = current;
     if (!c) return;
-    c.onAction?.();
-    this.dismiss();
+    try {
+      await c.onAction?.();
+    } finally {
+      this.dismiss();
+    }
   }
 };
