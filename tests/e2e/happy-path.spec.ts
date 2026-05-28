@@ -1,27 +1,40 @@
 import { test, expect } from '@playwright/test';
 
-test('first run → template → erfasse Hitzewallungen mit mittel → editiere → swipe weg → undo', async ({ page }) => {
+test('first run → template → daily prompt → slider + Fertig → card in Heute erfasst', async ({ page }) => {
   await page.goto('/');
   await page.waitForURL(/\/tag\/\d{4}-\d{2}-\d{2}/);
 
-  // First-run shown
+  // First run banner: import template
   await expect(page.getByRole('button', { name: 'Mit Standard-Vorlage starten' })).toBeVisible();
   await page.getByRole('button', { name: 'Mit Standard-Vorlage starten' }).click();
 
-  // Page reload → first-run gone, FAB visible
-  await expect(page.getByRole('button', { name: 'Symptom hinzufügen' })).toBeVisible({ timeout: 5000 });
+  // After import: Daily-Prompts appear at top.
+  // Template marks Stimmungstief as daily → it shows under "Noch offen".
+  await expect(page.getByText('Noch offen')).toBeVisible();
+  await expect(page.locator('button:has-text("Stimmungstief")').first()).toBeVisible();
 
-  // Open sheet, drill into "Körperlich", pick Hitzewallungen
-  await page.getByRole('button', { name: 'Symptom hinzufügen' }).click();
-  await page.getByText('Körperlich', { exact: true }).click();
-  await page.getByText('Hitzewallungen').click();
+  // Tap the prompt → Editor opens.
+  await page.locator('button:has-text("Stimmungstief")').first().click();
 
-  // Editor opens — pick Mittel
-  await page.getByRole('button', { name: 'Mittel' }).click();
+  // Stimmungstief's slider is optional (required = false in default template),
+  // so Fertig is enabled right away — the whole point of the daily-prompt flow.
+  await expect(page.getByRole('button', { name: 'Fertig' })).toBeEnabled();
+
+  // Click on the slider track in the continuous zone (right side) to set a value.
+  const track = page.locator('[data-track]').first();
+  const box = await track.boundingBox();
+  if (!box) throw new Error('track missing');
+  await page.mouse.click(box.x + box.width * 0.7, box.y + box.height / 2);
+
+  // Still enabled, save the entry.
+  await expect(page.getByRole('button', { name: 'Fertig' })).toBeEnabled();
   await page.getByRole('button', { name: 'Fertig' }).click();
 
-  // Entry shown on day list (scope to the entry card; sheet may still be open behind)
-  const card = page.locator('.card').filter({ hasText: 'Hitzewallungen' });
+  // Card appears in the "Heute erfasst" section.
+  await expect(page.getByText(/Heute erfasst/)).toBeVisible();
+  // DailyPromptCard (data-muted="true") and EntryCard share class="card";
+  // the prompt for Stimmungstief may briefly remain until liveQuery refreshes,
+  // so we exclude muted cards to target the saved entry only.
+  const card = page.locator('button.card:not([data-muted])').filter({ hasText: 'Stimmungstief' });
   await expect(card).toBeVisible();
-  await expect(card.getByText('Mittel')).toBeVisible();
 });
