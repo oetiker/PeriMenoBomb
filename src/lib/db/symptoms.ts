@@ -1,4 +1,4 @@
-import { db, type Symptom, type SymptomInputs, defaultSymptomInputs } from './index';
+import { db, type Symptom, type SymptomInputs, defaultSymptomInputs, entryKey } from './index';
 import { newId } from '$lib/utils/uuid';
 
 export interface CreateSymptomInput {
@@ -188,4 +188,30 @@ export async function reorderSiblings(parentId: string | null, orderedIds: strin
 
 export function hasEnabledInput(inputs: SymptomInputs): boolean {
   return inputs.slider.enabled || inputs.number.enabled || inputs.comment.enabled;
+}
+
+function flattenTreeOrder(tree: TreeNode[]): Symptom[] {
+  const out: Symptom[] = [];
+  function recur(nodes: TreeNode[]) {
+    for (const n of nodes) {
+      // strip children to get plain Symptom shape
+      const { children: _kids, ...plain } = n;
+      out.push(plain as Symptom);
+      if (n.children.length) recur(n.children);
+    }
+  }
+  recur(tree);
+  return out;
+}
+
+export async function listDailySymptomsForDate(date: string): Promise<Symptom[]> {
+  const tree = await listTree(); // already excludes archived
+  const ordered = flattenTreeOrder(tree);
+  const eligible = ordered.filter((s) => !s.isFolder && s.daily && hasEnabledInput(s.inputs));
+  if (eligible.length === 0) return [];
+  const ids = eligible.map((s) => s.id);
+  const entryKeys = ids.map((id) => entryKey(date, id));
+  const existing = await db.entries.where('id').anyOf(entryKeys).primaryKeys() as string[];
+  const taken = new Set(existing);
+  return eligible.filter((s) => !taken.has(entryKey(date, s.id)));
 }

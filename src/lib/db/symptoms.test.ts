@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDatabase, db, defaultSymptomInputs } from './index';
 import { createSymptom, updateSymptom, getSymptom, archiveSymptom, listAllSymptoms, listChildren } from './symptoms';
-import { moveSymptom, reorderSiblings, subtreeDepth, listTree, hasEnabledInput } from './symptoms';
+import { moveSymptom, reorderSiblings, subtreeDepth, listTree, hasEnabledInput, listDailySymptomsForDate } from './symptoms';
+import { upsertEntry } from './entries';
 
 describe('symptoms CRUD', () => {
   beforeEach(() => resetDatabase());
@@ -137,5 +138,40 @@ describe('hasEnabledInput', () => {
     const inputs = defaultSymptomInputs();
     inputs.comment.enabled = true;
     expect(hasEnabledInput(inputs)).toBe(true);
+  });
+});
+
+describe('listDailySymptomsForDate', () => {
+  beforeEach(() => resetDatabase());
+
+  it('returns daily + enabled-input symptoms without entry for the date, in tree order', async () => {
+    const a = await createSymptom({ name: 'A' });          // not daily
+    const b = await createSymptom({ name: 'B' });          // daily but no inputs → excluded
+    const c = await createSymptom({ name: 'C' });          // daily + slider → included
+    const d = await createSymptom({ name: 'D' });          // daily + comment → included but archived
+    const e = await createSymptom({ name: 'E' });          // daily + comment → included but has entry
+    const folder = await createSymptom({ name: 'F', isFolder: true });
+    const childIn = await createSymptom({ name: 'G', parentId: folder.id }); // child, daily, included
+    // Configure
+    await updateSymptom(b.id, { daily: true });
+    const cIn = c.inputs; cIn.slider.enabled = true;
+    await updateSymptom(c.id, { daily: true, inputs: cIn });
+    const dIn = d.inputs; dIn.comment.enabled = true;
+    await updateSymptom(d.id, { daily: true, inputs: dIn, archived: true });
+    const eIn = e.inputs; eIn.comment.enabled = true;
+    await updateSymptom(e.id, { daily: true, inputs: eIn });
+    const gIn = childIn.inputs; gIn.comment.enabled = true;
+    await updateSymptom(childIn.id, { daily: true, inputs: gIn });
+    // e already has an entry → excluded
+    await upsertEntry({ date: '2026-05-28', symptomId: e.id, comment: 'done' });
+
+    const result = await listDailySymptomsForDate('2026-05-28');
+    // Expected (in tree order): C (root), G (child of F).
+    expect(result.map((s) => s.name)).toEqual(['C', 'G']);
+  });
+
+  it('returns empty list when no daily symptoms', async () => {
+    await createSymptom({ name: 'X' });
+    expect(await listDailySymptomsForDate('2026-05-28')).toEqual([]);
   });
 });
