@@ -139,7 +139,6 @@
     color: var(--c-text);
     cursor: pointer;
   }
-  .icon-btn.active { background: var(--c-primary); color: var(--c-primary-contrast); border-color: var(--c-primary); }
   .list { list-style: none; margin: 0; padding: 0; }
   .row {
     display: flex; align-items: center; gap: 0;
