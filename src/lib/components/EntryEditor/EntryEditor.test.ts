@@ -53,6 +53,8 @@ describe('EntryEditor', () => {
     });
     await fireEvent.click(getByText('Verwerfen'));
     await tick();
+    // onVerwerfen is async (awaits clearDialog); give it a tick to resolve.
+    await new Promise((r) => setTimeout(r, 30));
     expect(onClose).toHaveBeenCalled();
     expect(await db.entries.get('2026-05-28__s1')).toBeUndefined();
   });
@@ -67,5 +69,39 @@ describe('EntryEditor', () => {
     expect(getByPlaceholderText('z.B. Auslöser, Umstände…')).toBeTruthy();
     // Slider track not in DOM (since slider is disabled)
     expect(queryByPlaceholderText(/leicht/)).toBeNull();
+  });
+
+  it('restores initial values when initial prop is provided', async () => {
+    // Pre-seed an entry that should be IGNORED when initial is provided.
+    await db.entries.put({
+      id: '2026-05-28__s1', date: '2026-05-28', symptomId: 's1',
+      sliderValue: 99, numberValue: null, comment: 'persisted',
+      updatedAt: 1
+    });
+
+    const inputs = defaultSymptomInputs();
+    inputs.slider.enabled = true;
+    inputs.comment.enabled = true;
+    const s = makeSymptom({ inputs });
+
+    const { container } = render(EntryEditor, {
+      props: {
+        open: true,
+        date: '2026-05-28',
+        symptom: s,
+        initial: { sliderValue: 42, numberValue: null, comment: 'restored' },
+        onClose: () => {}
+      }
+    });
+    await tick();
+    await new Promise((r) => setTimeout(r, 30));
+
+    // The comment textarea should show 'restored' (the initial value), NOT 'persisted'.
+    const textarea = container.querySelector('textarea') as HTMLTextAreaElement;
+    expect(textarea.value).toBe('restored');
+
+    // Slider thumb is on the continuous track (value=42 is not null).
+    const thumb = container.querySelector('[data-thumb]') as HTMLElement;
+    expect(thumb.dataset.zone).toBe('continuous');
   });
 });

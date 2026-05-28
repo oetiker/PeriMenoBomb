@@ -47,12 +47,30 @@
   });
 
   // Persist dialog on open; update on every change; clear on close paths.
+  // The persist effect must run ONCE per open transition (snapshot current values
+  // without subscribing to them), otherwise every keystroke would trigger a full
+  // IndexedDB put.
+  let lastOpenedKey = $state<string | null>(null);
+
   $effect(() => {
-    if (!open) return;
+    if (!open) {
+      lastOpenedKey = null;
+      return;
+    }
+    const key = `${symptom.id}@${date}`;
+    if (lastOpenedKey === key) return;
+    lastOpenedKey = key;
+    const snapshot = untrack(() => ({
+      date: workingDate,
+      symptomId: symptom.id,
+      sliderValue,
+      numberValue,
+      comment
+    }));
     void persistDialog({
       kind: 'entry-editor',
       route: page.url.pathname,
-      payload: { date: workingDate, symptomId: symptom.id, sliderValue, numberValue, comment }
+      payload: snapshot
     });
   });
 
@@ -74,8 +92,8 @@
     onClose();
   }
 
-  function onVerwerfen() {
-    void clearDialog();
+  async function onVerwerfen() {
+    await clearDialog();
     onClose();
   }
 
