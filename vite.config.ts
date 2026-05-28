@@ -12,7 +12,7 @@ export default defineConfig({
     }),
     sveltekit(),
     SvelteKitPWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       manifest: {
         name: 'PeriMenoBomb',
         short_name: 'PeriMeno',

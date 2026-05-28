@@ -18,7 +18,11 @@ export const snackbar = {
     clearTimer();
     current = spec;
     const d = spec.durationMs ?? 5000;
-    timer = setTimeout(() => { current = null; timer = null; }, d);
+    // d <= 0 or Infinity → no auto-dismiss; user must invoke the action or
+    // explicitly dismiss. Useful for SW „update verfügbar"-Toast.
+    if (Number.isFinite(d) && d > 0) {
+      timer = setTimeout(() => { current = null; timer = null; }, d);
+    }
   },
   dismiss() {
     clearTimer();

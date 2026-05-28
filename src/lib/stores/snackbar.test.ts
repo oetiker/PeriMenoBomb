@@ -19,4 +19,10 @@ describe('snackbar store', () => {
     expect(undone).toBe(1);
     expect(snackbar.current).toBeNull();
   });
+
+  it('Infinity duration stays visible without auto-dismiss', () => {
+    snackbar.show({ message: 'Update verfügbar', durationMs: Infinity });
+    vi.advanceTimersByTime(60_000);
+    expect(snackbar.current?.message).toBe('Update verfügbar');
+  });
 });
