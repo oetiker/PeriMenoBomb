@@ -11,7 +11,7 @@
     type TreeNode
   } from '$lib/db/symptoms';
   import { liveQuery } from '$lib/stores/liveQuery.svelte';
-  import { dndzone, type DndEvent } from 'svelte-dnd-action';
+  import { dndzone, type DndEvent, SOURCES, TRIGGERS } from 'svelte-dnd-action';
   import type { Symptom } from '$lib/db';
 
   const treeQ = liveQuery(() => listTree(), [] as TreeNode[]);
@@ -20,6 +20,30 @@
   let expanded = $state(new Set<string>());
   let editing = $state<{ symptom: Symptom; isNew: boolean } | null>(null);
 
+  // Local mirror of the tree — required so svelte-dnd-action can update visuals
+  // during drag. Synced from the live query when no drag is in progress.
+  let localTree = $state<TreeNode[]>([]);
+  let isDragging = $state(false);
+  $effect(() => {
+    if (!isDragging) localTree = treeQ.current;
+  });
+
+  // Drag is disabled by default and only enabled while a drag handle is held.
+  // This is svelte-dnd-action's documented pattern for handle-only drag: flip
+  // `dragDisabled` in pointerdown on the handle, flip it back in dragend/finalize.
+  let dndDisabled = $state(true);
+
+  function armDrag() {
+    dndDisabled = false;
+    const release = () => {
+      if (!isDragging) dndDisabled = true;
+      document.removeEventListener('pointerup', release);
+      document.removeEventListener('pointercancel', release);
+    };
+    document.addEventListener('pointerup', release, { once: true });
+    document.addEventListener('pointercancel', release, { once: true });
+  }
+
   function toggle(id: string) {
     if (expanded.has(id)) expanded.delete(id);
     else expanded.add(id);
@@ -27,7 +51,6 @@
   }
 
   function startAdd(isFolder: boolean) {
-    // Synthetic draft Symptom — never persisted unless the user clicks Anlegen.
     const draft: Symptom = {
       id: '',
       name: '',
@@ -49,13 +72,19 @@
     editing = { symptom: s, isNew: false };
   }
 
-  function handleConsider(_parentId: string | null, _e: CustomEvent<DndEvent<TreeNode>>) {
-    // Optimistic UI: dnd-action drives its own internal state during drag.
-    // We persist only on finalize. Visual feedback during drag is best-effort in MVP.
+  function handleConsider(e: CustomEvent<DndEvent<TreeNode>>) {
+    if (e.detail.info.trigger === TRIGGERS.DRAG_STARTED) isDragging = true;
+    localTree = e.detail.items;
   }
 
-  async function handleFinalize(parentId: string | null, e: CustomEvent<DndEvent<TreeNode>>) {
-    await reorderSiblings(parentId, e.detail.items.map((i) => i.id));
+  async function handleFinalize(e: CustomEvent<DndEvent<TreeNode>>) {
+    localTree = e.detail.items;
+    isDragging = false;
+    dndDisabled = true;
+    // Only persist if the drop came from this list (not from a foreign zone)
+    if (e.detail.info.source === SOURCES.POINTER || e.detail.info.source === SOURCES.KEYBOARD) {
+      await reorderSiblings(null, e.detail.items.map((i) => i.id));
+    }
   }
 </script>
 
@@ -84,7 +113,7 @@
     {#if node.isFolder}
       <button
         type="button"
-        class="chev {expanded.has(node.id) ? 'open' : ''}"
+        class="chev"
         onclick={() => toggle(node.id)}
         aria-label={expanded.has(node.id) ? 'Zuklappen' : 'Aufklappen'}
         aria-expanded={expanded.has(node.id)}
@@ -98,7 +127,14 @@
       <Badge icon={node.icon} color={node.color} size={28} />
       <span class="entry-name">{node.name}</span>
     </button>
-    <span class="drag-handle" aria-label="Ziehen zum Verschieben" title="Ziehen zum Verschieben">
+    <span
+      class="drag-handle"
+      role="button"
+      tabindex="0"
+      aria-label="Ziehen zum Verschieben"
+      title="Ziehen zum Verschieben"
+      onpointerdown={armDrag}
+    >
       <GripVertical size={20} />
     </span>
   </li>
@@ -109,12 +145,18 @@
 
 <ul
   class="list"
-  use:dndzone={{ items: treeQ.current, flipDurationMs: 120, type: 'roots' }}
-  onconsider={(e) => handleConsider(null, e as CustomEvent<DndEvent<TreeNode>>)}
-  onfinalize={(e) => handleFinalize(null, e as CustomEvent<DndEvent<TreeNode>>)}
+  use:dndzone={{
+    items: localTree,
+    flipDurationMs: 150,
+    dragDisabled: dndDisabled,
+    dropTargetStyle: {},
+    type: 'roots'
+  }}
+  onconsider={(e) => handleConsider(e as CustomEvent<DndEvent<TreeNode>>)}
+  onfinalize={(e) => handleFinalize(e as CustomEvent<DndEvent<TreeNode>>)}
 >
-  {#each treeQ.current as n (n.id)}{@render renderNode(n, 0)}{/each}
-  {#if treeQ.current.length === 0}<li class="empty">Noch keine Symptome.</li>{/if}
+  {#each localTree as n (n.id)}{@render renderNode(n, 0)}{/each}
+  {#if localTree.length === 0}<li class="empty">Noch keine Symptome.</li>{/if}
 </ul>
 
 {#if editing}
@@ -174,6 +216,7 @@
     cursor: grab;
     flex-shrink: 0;
     touch-action: none;
+    user-select: none;
   }
   .drag-handle:active { cursor: grabbing; color: var(--c-text); }
   .empty { padding: var(--sp-5); text-align: center; color: var(--c-text-dim); }
