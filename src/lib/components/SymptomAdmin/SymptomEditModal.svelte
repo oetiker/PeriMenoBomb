@@ -15,6 +15,8 @@
   } from '$lib/db/symptoms';
   import { liveQuery } from '$lib/stores/liveQuery.svelte';
   import { db, type Symptom, type Tag, defaultSymptomInputs, type SymptomInputs } from '$lib/db';
+  import { persistDialog, updateDialogPayload, clearDialog } from '$lib/stores/openDialog.svelte';
+  import { page } from '$app/state';
 
   type Props = {
     open: boolean;
@@ -42,6 +44,37 @@
     inputs = symptom.inputs ?? defaultSymptomInputs();
     daily = symptom.daily ?? false;
     view = 'main';
+  });
+
+  $effect(() => {
+    if (!open) return;
+    void persistDialog({
+      kind: 'symptom-edit',
+      route: page.url.pathname,
+      payload: {
+        symptomId: isNew ? null : symptom.id,
+        isNew,
+        isFolder: symptom.isFolder,
+        name, color, icon,
+        tagIds: $state.snapshot(tagIds),
+        parentId,
+        inputs: $state.snapshot(inputs),
+        daily,
+        view
+      }
+    });
+  });
+
+  $effect(() => {
+    if (!open) return;
+    void updateDialogPayload({
+      name, color, icon,
+      tagIds: $state.snapshot(tagIds),
+      parentId,
+      inputs: $state.snapshot(inputs),
+      daily,
+      view
+    });
   });
 
   const tagsQ = liveQuery(() => db.tags.toArray(), [] as Tag[]);
@@ -74,6 +107,7 @@
         await moveSymptom(symptom.id, parentId);
       }
     }
+    await clearDialog();
     onClose();
   }
 
@@ -82,6 +116,12 @@
   async function doArchive() {
     archiveConfirm = false;
     await archiveSymptom(symptom.id);
+    await clearDialog();
+    onClose();
+  }
+
+  async function onCancel() {
+    await clearDialog();
     onClose();
   }
 
@@ -92,7 +132,7 @@
   );
 </script>
 
-<Modal {open} {onClose} {title}>
+<Modal {open} onClose={onCancel} {title}>
   {#if view === 'icons'}
     <IconPicker value={icon} {color} onChange={(i) => { icon = i; view = 'main'; }} />
     <button type="button" class="link" onclick={() => view = 'main'}>‹ Zurück</button>
