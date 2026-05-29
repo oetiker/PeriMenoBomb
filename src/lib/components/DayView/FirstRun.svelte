@@ -16,7 +16,7 @@
   }
   async function buildOwn() {
     await setMeta('firstRunCompleted', true);
-    await goto('/symptome', { replaceState: true });
+    await goto('/symptoms', { replaceState: true });
   }
 </script>
 

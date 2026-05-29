@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test('first run → template → daily prompt → slider + Speichern → card in Heute erfasst', async ({ page }) => {
   // (Editor save/delete buttons: "Speichern" enables an entry, "Löschen" removes it.)
   await page.goto('/');
-  await page.waitForURL(/\/tag\/\d{4}-\d{2}-\d{2}/);
+  await page.waitForURL(/\/day\/\d{4}-\d{2}-\d{2}/);
 
   // First run banner: import template
   await expect(page.getByRole('button', { name: 'Mit Standard-Vorlage starten' })).toBeVisible();

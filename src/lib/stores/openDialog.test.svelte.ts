@@ -11,7 +11,7 @@ describe('openDialog store', () => {
   it('persistDialog writes meta.openDialog', async () => {
     const s: OpenDialogState = {
       kind: 'entry-editor',
-      route: '/tag/2026-05-28',
+      route: '/day/2026-05-28',
       payload: { date: '2026-05-28', symptomId: 'x', sliderValue: null, numberValue: null, comment: '' }
     };
     await persistDialog(s);
@@ -22,7 +22,7 @@ describe('openDialog store', () => {
   it('updateDialogPayload patches the payload', async () => {
     const s: OpenDialogState = {
       kind: 'entry-editor',
-      route: '/tag/2026-05-28',
+      route: '/day/2026-05-28',
       payload: { date: '2026-05-28', symptomId: 'x', sliderValue: null, numberValue: null, comment: '' }
     };
     await persistDialog(s);
@@ -34,7 +34,7 @@ describe('openDialog store', () => {
 
   it('clearDialog removes the row', async () => {
     await persistDialog({
-      kind: 'entry-editor', route: '/tag/2026-05-28',
+      kind: 'entry-editor', route: '/day/2026-05-28',
       payload: { date: '2026-05-28', symptomId: 'x', sliderValue: null, numberValue: null, comment: '' }
     });
     await clearDialog();

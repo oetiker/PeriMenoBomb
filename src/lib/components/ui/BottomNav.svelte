@@ -3,10 +3,11 @@
   import { CalendarDays, LineChart, Settings, MoreHorizontal } from '@lucide/svelte';
   type Item = { href: string; label: string; Icon: any; match: (p: string) => boolean };
   const items: Item[] = [
-    { href: '/', label: 'Tag', Icon: CalendarDays, match: (p) => p === '/' || p.startsWith('/tag') },
-    { href: '/verlauf', label: 'Verlauf', Icon: LineChart, match: (p) => p.startsWith('/verlauf') },
-    { href: '/symptome', label: 'Symptome', Icon: Settings, match: (p) => p.startsWith('/symptome') },
-    { href: '/einstellungen', label: 'Mehr', Icon: MoreHorizontal, match: (p) => p.startsWith('/einstellungen') || p.startsWith('/tags') }
+    { href: '/', label: 'Tag', Icon: CalendarDays, match: (p) => p === '/' || p.startsWith('/day') },
+    { href: '/report', label: 'Verlauf', Icon: LineChart, match: (p) => p.startsWith('/report') },
+    { href: '/symptoms', label: 'Symptome', Icon: Settings, match: (p) => p.startsWith('/symptoms') },
+    // /tags is a sub-section reached from the "Mehr" area, so it lights up this tab too.
+    { href: '/settings', label: 'Mehr', Icon: MoreHorizontal, match: (p) => p.startsWith('/settings') || p.startsWith('/tags') }
   ];
 </script>
 
