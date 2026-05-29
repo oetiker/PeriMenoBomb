@@ -35,6 +35,11 @@ export function hexToHsl(hex: string): { h: number; s: number; l: number } {
   return { h, s, l };
 }
 
+export function hexToRgba(hex: string, alpha: number): string {
+  const rgb = parseHex(hex) ?? { r: 0, g: 0, b: 0 };
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+}
+
 export function emojiDuotoneFilter(hex: string): string {
   const { h, l } = hexToHsl(hex);
   // sepia anchors the hue near 50°. Rotate the gap to land on the user's hue.
