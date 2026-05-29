@@ -4,14 +4,9 @@
   import { listTags } from '$lib/db/tags';
   import { getMeta, setMeta } from '$lib/db/meta';
   import { filterEntries, groupEntriesByDay, type EntryFilter } from '$lib/report/filter';
-  import { entriesToPdfBody } from '$lib/report/pdf';
   import { formatLong, todayKey } from '$lib/utils/date';
   import ReportEntryRow from '$lib/components/report/ReportEntryRow.svelte';
   import { snackbar } from '$lib/stores/snackbar.svelte';
-
-  // suppress unused import warning — entriesToPdfBody is used only for type-checking
-  // the export path; actual use is via dynamic import
-  void entriesToPdfBody;
 
   const FILTER_KEY = 'report.list.filter';
 
