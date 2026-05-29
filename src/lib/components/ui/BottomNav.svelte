@@ -12,7 +12,12 @@
 
 <nav class="bottom-nav" aria-label="Hauptnavigation">
   {#each items as it}
-    <a href={it.href} class="item {it.match(page.url.pathname) ? 'active' : ''}">
+    <a
+      href={it.href}
+      data-sveltekit-replacestate
+      data-sveltekit-noscroll
+      class="item {it.match(page.url.pathname) ? 'active' : ''}"
+    >
       <it.Icon size={20} />
       <span>{it.label}</span>
     </a>

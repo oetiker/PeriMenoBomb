@@ -7,7 +7,7 @@
 </script>
 
 <button type="button" class="card" data-muted="true" onclick={onTap}>
-  <div class="badge-wrap"><Badge icon={symptom.icon} color={symptom.color} size={28} /></div>
+  <div class="badge-wrap"><Badge icon={symptom.icon} color={symptom.color} duotone={symptom.duotone ?? true} bg={symptom.bg ?? true} size={28} /></div>
   <div class="text">
     <div class="name">{symptom.name}</div>
     <div class="hint">noch nicht erfasst</div>

@@ -19,7 +19,7 @@ describe('db schema', () => {
     expect(row?.value).toBe('de');
   });
 
-  it('reports version 2', () => {
-    expect(db.verno).toBe(2);
+  it('reports version 4', () => {
+    expect(db.verno).toBe(4);
   });
 });

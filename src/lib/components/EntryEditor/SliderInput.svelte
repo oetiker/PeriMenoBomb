@@ -11,6 +11,7 @@
   // We compute zones live from each rect to support container resizes.
   const UNSPEZ_PX = 30;
   const GAP_PX = 18;
+  const RIGHT_INDENT_PX = 30;
 
   let trackEl = $state<HTMLElement | undefined>();
   let dragPointerId: number | null = null;
@@ -27,7 +28,7 @@
       if (value === null) return { zone: 'unspez', pos: null };
       return { zone: 'continuous', pos: 1 };
     }
-    const trackWidth = rect.width - contStart;
+    const trackWidth = rect.width - contStart - RIGHT_INDENT_PX;
     if (trackWidth <= 0) return { zone: 'continuous', pos: 1 };
     const t = Math.max(0, Math.min(1, (x - contStart) / trackWidth));
     const pos = Math.round(1 + t * 99); // 1..100
@@ -77,12 +78,12 @@
   function thumbStyle(): string {
     if (!trackEl) {
       // Pre-mount fallback; CSS positions thumb via data-zone too.
-      return value === null ? 'left: 14px;' : 'left: calc(100% - 14px);';
+      return value === null ? `left: ${UNSPEZ_PX / 2}px;` : 'left: calc(100% - 14px);';
     }
     const rect = trackEl.getBoundingClientRect();
     if (value === null) return `left: ${UNSPEZ_PX / 2}px;`;
     const contStart = UNSPEZ_PX + GAP_PX;
-    const trackWidth = rect.width - contStart;
+    const trackWidth = rect.width - contStart - RIGHT_INDENT_PX;
     const safeValue = Math.max(1, Math.min(100, value));
     const t = (safeValue - 1) / 99;
     return `left: ${contStart + t * trackWidth}px;`;
@@ -106,7 +107,9 @@
     <span class="unspez-label">unspez</span>
     <span class="spacer"></span>
     <span class="low">{lowLabel || 'linker Endpunkt'}</span>
+    <span class="position" data-position>{value ?? '—'}</span>
     <span class="high">{highLabel || 'rechter Endpunkt'}</span>
+    <span class="high-spacer"></span>
   </div>
 </div>
 
@@ -127,12 +130,12 @@
     background: transparent;
   }
   .cont-track {
-    position: absolute; left: 48px; right: 0; top: 14px; height: 4px;
+    position: absolute; left: 48px; right: 30px; top: 14px; height: 4px;
     background: var(--c-border); border-radius: 2px;
   }
   .thumb {
-    position: absolute; top: 8px; width: 16px; height: 16px;
-    margin-left: -8px;
+    position: absolute; top: 5.5px; width: 21px; height: 21px;
+    margin-left: -10.5px;
     border-radius: 50%; background: var(--c-primary);
     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
     transition: left 50ms ease-out;
@@ -143,5 +146,7 @@
   .spacer { width: 18px; }
   .low, .high { flex: 1; }
   .low { text-align: left; padding-left: 4px; }
+  .position { text-align: center; min-width: 2.5em; font-variant-numeric: tabular-nums; }
   .high { text-align: right; padding-right: 4px; }
+  .high-spacer { width: 30px; }
 </style>

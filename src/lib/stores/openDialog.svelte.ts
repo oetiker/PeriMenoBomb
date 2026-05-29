@@ -26,6 +26,8 @@ export type OpenDialogState =
         parentId: string | null;
         inputs: SymptomInputs;
         daily: boolean;
+        duotone: boolean;
+        bg: boolean;
         view: 'main' | 'icons';
       };
     };

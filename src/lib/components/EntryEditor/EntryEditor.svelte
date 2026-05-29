@@ -4,12 +4,14 @@
   import Badge from '$lib/components/ui/Badge.svelte';
   import SliderInput from './SliderInput.svelte';
   import NumberInput from './NumberInput.svelte';
-  import { upsertEntry, getEntry, validateEntry } from '$lib/db/entries';
+  import SymptomEditModal from '$lib/components/SymptomAdmin/SymptomEditModal.svelte';
+  import { upsertEntry, getEntry, deleteEntry, validateEntry } from '$lib/db/entries';
   import type { Symptom } from '$lib/db';
   import { isValidDateKey, formatLong } from '$lib/utils/date';
   import {
     persistDialog, updateDialogPayload, clearDialog
   } from '$lib/stores/openDialog.svelte';
+  import { snackbar } from '$lib/stores/snackbar.svelte';
   import { page } from '$app/state';
 
   type Props = {
@@ -26,6 +28,7 @@
   let sliderValue = $state<number | null>(untrack(() => initial?.sliderValue ?? null));
   let numberValue = $state<number | null>(untrack(() => initial?.numberValue ?? null));
   let comment = $state(untrack(() => initial?.comment ?? ''));
+  let configOpen = $state(false);
 
   // Load existing entry once on open. If `initial` is provided (restore path), skip — restored values win.
   $effect(() => {
@@ -81,7 +84,7 @@
 
   const validation = $derived(validateEntry(symptom, { sliderValue, numberValue, comment }));
 
-  async function onFertig() {
+  async function onSave() {
     if (!validation.ok) return;
     await upsertEntry({
       date: workingDate,
@@ -92,7 +95,29 @@
     onClose();
   }
 
-  async function onVerwerfen() {
+  async function onCancel() {
+    await clearDialog();
+    onClose();
+  }
+
+  async function onDelete() {
+    const existing = await getEntry(workingDate, symptom.id);
+    if (existing) {
+      await deleteEntry(workingDate, symptom.id);
+      snackbar.show({
+        message: `${symptom.name} gelöscht`,
+        actionLabel: 'Rückgängig',
+        onAction: async () => {
+          await upsertEntry({
+            date: existing.date,
+            symptomId: existing.symptomId,
+            sliderValue: existing.sliderValue,
+            numberValue: existing.numberValue,
+            comment: existing.comment
+          });
+        }
+      });
+    }
     await clearDialog();
     onClose();
   }
@@ -109,11 +134,35 @@
       try { el.showPicker(); } catch { /* needs a user gesture; we have one */ }
     }
   }
+
+  // Stacking SymptomEditModal on top means it also writes to the openDialog
+  // store under its own kind. When the user dismisses the inner modal we
+  // restore the entry-editor state, so a cold start lands on the entry editor
+  // (the dialog the user is *actually* still inside), not on the symptom config.
+  function onConfigClose() {
+    configOpen = false;
+    void persistDialog({
+      kind: 'entry-editor',
+      route: page.url.pathname,
+      payload: {
+        date: workingDate,
+        symptomId: symptom.id,
+        sliderValue, numberValue, comment
+      }
+    });
+  }
 </script>
 
-<Modal {open} onClose={onVerwerfen}>
+<Modal {open} onClose={onCancel}>
   <div class="header">
-    <Badge icon={symptom.icon} color={symptom.color} size={36} />
+    <button
+      type="button"
+      class="badge-tap"
+      aria-label="{symptom.name} — Doppeltipp öffnet die Symptom-Konfiguration"
+      ondblclick={() => (configOpen = true)}
+    >
+      <Badge icon={symptom.icon} color={symptom.color} duotone={symptom.duotone ?? true} bg={symptom.bg ?? true} size={36} />
+    </button>
     <h3>{symptom.name}</h3>
   </div>
 
@@ -165,20 +214,40 @@
     </section>
   {/if}
 
-  <button type="button" class="primary" onclick={onFertig} disabled={!validation.ok}>Fertig</button>
-  <button type="button" class="discard" onclick={onVerwerfen}>Verwerfen</button>
+  {#snippet footer()}
+    <button type="button" class="discard" onclick={onDelete}>Löschen</button>
+    <button type="button" class="primary" onclick={onSave} disabled={!validation.ok}>Speichern</button>
+  {/snippet}
 </Modal>
 
+{#if configOpen}
+  <SymptomEditModal open={true} {symptom} onClose={onConfigClose} />
+{/if}
+
 <style>
-  .header { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); }
-  .header h3 { margin: 0; font-size: var(--fs-lg); }
+  /* Reserve right-edge real estate so the title doesn't slip under the
+     Modal's own X-close button at top:sp-3, right:sp-3 (≈44px wide overall). */
+  .header { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); padding-right: 44px; }
+  .header h3 { margin: 0; font-size: var(--fs-lg); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  /* Badge is wrapped in a tap target — double-tap opens the symptom config
+     dialog (hidden feature, no visible chrome). touch-action: manipulation
+     disables the iOS double-tap zoom on this element so the dblclick fires
+     reliably. */
+  .badge-tap {
+    border: 0;
+    background: none;
+    padding: 0;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
   .caption { font-size: var(--fs-xs); color: var(--c-text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--sp-2); }
   .req { color: var(--c-danger); margin-left: 4px; }
   section { margin-bottom: var(--sp-4); }
   .comment { width: 100%; padding: var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--r-2); resize: vertical; font: inherit; box-sizing: border-box; }
-  .primary { width: 100%; background: var(--c-primary); color: var(--c-primary-contrast); border: 0; padding: var(--sp-3); border-radius: var(--r-2); font-weight: var(--fw-bold); cursor: pointer; }
+  .primary { background: var(--c-primary); color: var(--c-primary-contrast); border: 0; padding: var(--sp-3); border-radius: var(--r-2); font-weight: var(--fw-bold); cursor: pointer; }
   .primary[disabled] { opacity: 0.4; cursor: not-allowed; }
-  .discard { display: block; margin: var(--sp-3) auto 0; color: var(--c-danger); background: none; border: 0; cursor: pointer; }
+  .discard { color: var(--c-danger); background: var(--c-surface-2); border: 1px solid var(--c-danger); padding: var(--sp-3); border-radius: var(--r-2); cursor: pointer; }
   .date-row {
     display: inline-flex; align-items: center; gap: var(--sp-2);
     padding: var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--r-2);

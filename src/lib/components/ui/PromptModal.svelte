@@ -61,10 +61,10 @@
     {placeholder}
     onkeydown={onKey}
   />
-  <div class="actions">
+  {#snippet footer()}
     <button type="button" class="secondary" onclick={onCancel}>Abbrechen</button>
     <button type="button" class="primary" onclick={submit}>{submitLabel}</button>
-  </div>
+  {/snippet}
 </Modal>
 
 <style>
@@ -82,14 +82,8 @@
     border-radius: var(--r-2);
     box-sizing: border-box;
   }
-  .actions {
-    display: flex;
-    gap: var(--sp-2);
-    margin-top: var(--sp-4);
-  }
   .primary,
   .secondary {
-    flex: 1;
     padding: var(--sp-3);
     border-radius: var(--r-2);
     cursor: pointer;

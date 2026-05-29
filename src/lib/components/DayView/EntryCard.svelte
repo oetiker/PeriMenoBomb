@@ -26,7 +26,7 @@
 
 <SwipeRow {onSwipe}>
   <button type="button" class="card" onclick={onTap}>
-    <Badge icon={symptom.icon} color={symptom.color} size={28} />
+    <Badge icon={symptom.icon} color={symptom.color} duotone={symptom.duotone ?? true} bg={symptom.bg ?? true} size={28} />
     <div class="text">
       <div class="name">{symptom.name}</div>
       <div class="meta">

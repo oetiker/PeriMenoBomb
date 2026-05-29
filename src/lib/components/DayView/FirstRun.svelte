@@ -2,16 +2,21 @@
   import { importTemplate } from '$lib/templates/import';
   import { DEFAULT_TEMPLATE } from '$lib/templates/perimeno-default';
   import { setMeta } from '$lib/db/meta';
+  import { snackbar } from '$lib/stores/snackbar.svelte';
   import { goto } from '$app/navigation';
 
   async function useTemplate() {
-    await importTemplate(DEFAULT_TEMPLATE);
-    await setMeta('firstRunCompleted', true);
-    location.reload();
+    try {
+      await importTemplate(DEFAULT_TEMPLATE);
+      await setMeta('firstRunCompleted', true);
+      location.reload();
+    } catch (err) {
+      snackbar.show({ message: `Vorlage konnte nicht importiert werden: ${(err as Error).message}` });
+    }
   }
   async function buildOwn() {
     await setMeta('firstRunCompleted', true);
-    await goto('/symptome');
+    await goto('/symptome', { replaceState: true });
   }
 </script>
 

@@ -2,10 +2,10 @@
   import { untrack } from 'svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
   import Badge from '$lib/components/ui/Badge.svelte';
-  import ColorPicker from '$lib/components/ui/ColorPicker.svelte';
-  import IconPicker from '$lib/components/ui/IconPicker.svelte';
   import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
   import InputConfigSection from './InputConfigSection.svelte';
+  import SymptomLookModal from './SymptomLookModal.svelte';
+  import { emojiName } from '$lib/icons/emoji';
   import {
     createSymptom,
     updateSymptom,
@@ -33,6 +33,8 @@
   let parentId = $state<string | null>(untrack(() => symptom.parentId));
   let inputs = $state<SymptomInputs>(untrack(() => symptom.inputs ?? defaultSymptomInputs()));
   let daily = $state(untrack(() => symptom.daily ?? false));
+  let duotone = $state(untrack(() => symptom.duotone ?? true));
+  let bg = $state(untrack(() => symptom.bg ?? true));
   let view = $state<'main' | 'icons'>('main');
 
   $effect(() => {
@@ -43,6 +45,8 @@
     parentId = symptom.parentId;
     inputs = symptom.inputs ?? defaultSymptomInputs();
     daily = symptom.daily ?? false;
+    duotone = symptom.duotone ?? true;
+    bg = symptom.bg ?? true;
     view = 'main';
   });
 
@@ -60,6 +64,8 @@
         parentId,
         inputs: $state.snapshot(inputs),
         daily,
+        duotone,
+        bg,
         view
       }
     });
@@ -73,6 +79,8 @@
       parentId,
       inputs: $state.snapshot(inputs),
       daily,
+      duotone,
+      bg,
       view
     });
   });
@@ -99,10 +107,12 @@
         icon,
         tagIds: snapTags,
         inputs: snapInputs,
-        daily
+        daily,
+        duotone,
+        bg
       });
     } else {
-      await updateSymptom(symptom.id, { name: trimmedName, color, icon, tagIds: snapTags, inputs: snapInputs, daily });
+      await updateSymptom(symptom.id, { name: trimmedName, color, icon, tagIds: snapTags, inputs: snapInputs, daily, duotone, bg });
       if (parentId !== symptom.parentId) {
         await moveSymptom(symptom.id, parentId);
       }
@@ -133,11 +143,7 @@
 </script>
 
 <Modal {open} onClose={onCancel} {title}>
-  {#if view === 'icons'}
-    <IconPicker value={icon} {color} onChange={(i) => { icon = i; view = 'main'; }} />
-    <button type="button" class="link" onclick={() => view = 'main'}>‹ Zurück</button>
-  {:else}
-    <div class="preview"><Badge {icon} {color} size={36} /><strong>{name || '—'}</strong></div>
+    <div class="preview"><Badge {icon} {color} {duotone} {bg} size={36} /><strong>{name || '—'}</strong></div>
 
     <label class="field">
       <span>Name</span>
@@ -145,15 +151,12 @@
     </label>
 
     <div class="field">
-      <span>Icon</span>
+      <span>Aussehen</span>
       <button type="button" class="icon-btn" onclick={() => view = 'icons'}>
-        <Badge {icon} {color} size={28} /> <span class="iname">{icon}</span> ›
+        <Badge {icon} {color} {duotone} {bg} size={28} />
+        <span class="iname">{emojiName(icon) ?? 'Eigenes Emoji'}</span>
+        <span class="chev" aria-hidden="true">›</span>
       </button>
-    </div>
-
-    <div class="field">
-      <span>Farbe</span>
-      <ColorPicker value={color} onChange={(c) => color = c} />
     </div>
 
     {#if !symptom.isFolder}
@@ -187,14 +190,23 @@
       />
     {/if}
 
-    <button type="button" class="primary" onclick={save} disabled={!name.trim()}>
-      {isNew ? 'Anlegen' : 'Speichern'}
-    </button>
+  {#snippet footer()}
     {#if !isNew}
       <button type="button" class="danger" onclick={startArchive}>Archivieren</button>
     {/if}
-  {/if}
+    <button type="button" class="primary" onclick={save} disabled={!name.trim()}>
+      {isNew ? 'Anlegen' : 'Speichern'}
+    </button>
+  {/snippet}
 </Modal>
+
+<SymptomLookModal
+  open={view === 'icons'}
+  {icon} {color} {duotone} {bg}
+  name={name.trim() || undefined}
+  onSave={(p) => { icon = p.icon; color = p.color; duotone = p.duotone; bg = p.bg; }}
+  onClose={() => (view = 'main')}
+/>
 
 {#if !isNew}
   <ConfirmModal
@@ -214,13 +226,13 @@
   .field > span { font-size: var(--fs-xs); color: var(--c-text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
   input, select { padding: var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--r-2); }
   .icon-btn { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--r-2); background: var(--c-surface); cursor: pointer; }
-  .iname { font-family: ui-monospace, monospace; flex: 1; text-align: left; }
+  .iname { flex: 1; text-align: left; }
+  .chev { color: var(--c-text-dim); }
   .chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
   .chip { padding: var(--sp-2) var(--sp-3); border-radius: var(--r-pill); border: 1px solid var(--c-border); background: var(--c-surface); cursor: pointer; }
   .chip.on { background: var(--c-primary); color: var(--c-primary-contrast); border-color: var(--c-primary); }
   .muted { color: var(--c-text-dim); font-size: var(--fs-sm); }
-  .primary { width: 100%; background: var(--c-primary); color: var(--c-primary-contrast); border: 0; padding: var(--sp-3); border-radius: var(--r-2); font-weight: var(--fw-bold); cursor: pointer; }
+  .primary { background: var(--c-primary); color: var(--c-primary-contrast); border: 0; padding: var(--sp-3); border-radius: var(--r-2); font-weight: var(--fw-bold); cursor: pointer; }
   .primary[disabled] { opacity: 0.4; cursor: not-allowed; }
-  .danger { display: block; margin: var(--sp-3) auto 0; color: var(--c-danger); background: none; border: 0; cursor: pointer; }
-  .link { background: none; border: 0; color: var(--c-text-dim); cursor: pointer; }
+  .danger { color: var(--c-danger); background: var(--c-surface-2); border: 1px solid var(--c-danger); padding: var(--sp-3); border-radius: var(--r-2); cursor: pointer; }
 </style>

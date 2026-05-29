@@ -45,7 +45,7 @@
           class="row {s.isFolder ? 'folder' : 'symptom'}"
           onclick={() => s.isFolder ? drill(s) : pick(s)}
         >
-          <Badge icon={s.icon} color={s.color} size={28} />
+          <Badge icon={s.icon} color={s.color} duotone={s.duotone ?? true} bg={s.bg ?? true} size={28} />
           <span class="name">{s.name}</span>
           {#if enteredIds.has(s.id) && !s.isFolder}
             <span class="chip">erfasst</span>

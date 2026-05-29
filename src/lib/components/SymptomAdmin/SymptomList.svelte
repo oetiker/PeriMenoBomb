@@ -558,7 +558,7 @@
       <span class="chev-spacer" aria-hidden="true"></span>
     {/if}
     <button type="button" class="entry" onclick={() => startEdit(node)}>
-      <Badge icon={node.icon} color={node.color} size={28} />
+      <Badge icon={node.icon} color={node.color} duotone={node.duotone ?? true} bg={node.bg ?? true} size={28} />
       <span class="entry-name">{node.name}</span>
     </button>
     <span
@@ -605,7 +605,7 @@
         {#each archivedQ.current as s (s.id)}
           {@const pn = parentNameOf(s)}
           <li class="archived-row">
-            <div class="archived-badge"><Badge icon={s.icon} color={s.color} size={28} archived /></div>
+            <div class="archived-badge"><Badge icon={s.icon} color={s.color} duotone={s.duotone ?? true} bg={s.bg ?? true} size={28} archived /></div>
             <div class="archived-text">
               <div class="archived-name">{s.name}</div>
               {#if pn}<div class="archived-parent">im Ordner: {pn}</div>{/if}
@@ -635,8 +635,8 @@
     width: 40px; height: 40px;
     display: inline-flex; align-items: center; justify-content: center;
     padding: 0;
-    border: 1px solid var(--c-border); border-radius: var(--r-2);
-    background: var(--c-surface);
+    border: 0;
+    background: none;
     color: var(--c-text);
     cursor: pointer;
   }

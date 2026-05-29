@@ -1,7 +1,13 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  type Props = { value: string; onChange: (color: string) => void };
-  let { value, onChange }: Props = $props();
+  type Props = {
+    value: string;
+    onChange: (color: string) => void;
+    /** Drop swatch size from ~60px to ~36px so the picker doesn't dominate
+        tall modals like the Icon Picker. */
+    compact?: boolean;
+  };
+  let { value, onChange, compact = false }: Props = $props();
 
   const PALETTE = [
     '#ef4444','#f97316','#f59e0b','#eab308',
@@ -20,7 +26,7 @@
   }
 </script>
 
-<div class="grid">
+<div class="grid" class:compact>
   {#each PALETTE as c}
     <button
       type="button"
@@ -43,6 +49,11 @@
     grid-template-columns: repeat(6, 1fr);
     gap: var(--sp-2);
   }
+  .grid.compact {
+    grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
+    gap: var(--sp-1);
+  }
+  .grid.compact .swatch { max-width: 36px; max-height: 36px; }
   .swatch {
     aspect-ratio: 1;
     border-radius: 50%;

@@ -29,10 +29,10 @@ describe('SliderInput', () => {
       props: { value: null, lowLabel: 'leicht', highLabel: 'hoch', onChange }
     });
     const track = container.querySelector('[data-track]') as HTMLElement;
-    // Pretend the track is 200px wide, unspez=0..30, gap=30..48, cont=48..200.
+    // Pretend the track is 200px wide, unspez=0..30, gap=30..48, cont=48..170 (30px right indent).
     vi.spyOn(track, 'getBoundingClientRect').mockReturnValue(makeRect(0, 200));
-    // Pointer at x=124 → middle of continuous range → ~50.
-    await fireEvent.pointerDown(track, { clientX: 124, clientY: 16, pointerId: 1 });
+    // Pointer at x=109 → middle of continuous range → ~50.
+    await fireEvent.pointerDown(track, { clientX: 109, clientY: 16, pointerId: 1 });
     await fireEvent.pointerUp(window, { pointerId: 1 });
     expect(onChange).toHaveBeenCalled();
     const v = onChange.mock.calls[0][0];

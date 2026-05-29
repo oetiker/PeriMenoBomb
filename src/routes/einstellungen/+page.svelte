@@ -63,9 +63,13 @@
   }
   async function runTemplateImport() {
     templateConfirm = null;
-    await importTemplate(DEFAULT_TEMPLATE);
-    await setMeta('firstRunCompleted', true);
-    snackbar.show({ message: 'Vorlage importiert.' });
+    try {
+      await importTemplate(DEFAULT_TEMPLATE);
+      await setMeta('firstRunCompleted', true);
+      snackbar.show({ message: 'Vorlage importiert.' });
+    } catch (err) {
+      snackbar.show({ message: `Vorlage konnte nicht importiert werden: ${(err as Error).message}` });
+    }
   }
 
   async function runWipe() {

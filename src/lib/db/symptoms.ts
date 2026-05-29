@@ -1,5 +1,6 @@
 import { db, type Symptom, type SymptomInputs, defaultSymptomInputs, entryKey } from './index';
 import { newId } from '$lib/utils/uuid';
+import { DEFAULT_SYMPTOM_EMOJI, DEFAULT_FOLDER_EMOJI } from '$lib/icons/emoji';
 
 export interface CreateSymptomInput {
   name: string;
@@ -10,11 +11,13 @@ export interface CreateSymptomInput {
   tagIds?: string[];
   inputs?: SymptomInputs;
   daily?: boolean;
+  duotone?: boolean;
+  bg?: boolean;
 }
 
 export const DEFAULT_COLOR = '#6b7280';
-export const DEFAULT_ICON = 'circle';
-export const DEFAULT_FOLDER_ICON = 'folder';
+export const DEFAULT_ICON = DEFAULT_SYMPTOM_EMOJI;
+export const DEFAULT_FOLDER_ICON = DEFAULT_FOLDER_EMOJI;
 export const MAX_DEPTH = 2; // 0,1,2 = drei Ebenen
 
 async function nextSortIndex(parentId: string | null): Promise<number> {
@@ -50,7 +53,9 @@ export async function createSymptom(input: CreateSymptomInput): Promise<Symptom>
     createdAt: now,
     updatedAt: now,
     inputs: input.inputs ?? defaultSymptomInputs(),
-    daily: input.daily ?? false
+    daily: input.daily ?? false,
+    duotone: input.duotone ?? true,
+    bg: input.bg ?? true
   };
   await db.symptoms.add(sym);
   return sym;

@@ -69,10 +69,11 @@
   <SymptomSheet open={sheetOpen} onClose={() => sheetOpen = false} {onPick} {enteredIds} />
 
   {#if editing}
+    {@const liveSymptom = symptomsQ.current.find((s) => s.id === editing!.symptom.id) ?? editing.symptom}
     <EntryEditor
       open={true}
       date={restoreInitial?.workingDate ?? currentDate.value}
-      symptom={editing.symptom}
+      symptom={liveSymptom}
       initial={restoreInitial
         ? { sliderValue: restoreInitial.sliderValue, numberValue: restoreInitial.numberValue, comment: restoreInitial.comment }
         : undefined}

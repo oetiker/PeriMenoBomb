@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import EntryEditor from './EntryEditor.svelte';
 import { db, defaultSymptomInputs, resetDatabase, type Symptom } from '$lib/db';
+import { snackbar } from '$lib/stores/snackbar.svelte';
 
 function makeSymptom(p: Partial<Symptom> = {}): Symptom {
   return {
@@ -15,16 +16,17 @@ function makeSymptom(p: Partial<Symptom> = {}): Symptom {
 
 describe('EntryEditor', () => {
   beforeEach(() => resetDatabase());
+  afterEach(() => snackbar.dismiss());
 
-  it('Fertig is enabled when nothing is required and writes a marker entry', async () => {
+  it('Speichern is enabled when nothing is required and writes a marker entry', async () => {
     const s = makeSymptom();
     const onClose = vi.fn();
     const { getByText } = render(EntryEditor, {
       props: { open: true, date: '2026-05-28', symptom: s, onClose }
     });
-    const fertig = getByText('Fertig') as HTMLButtonElement;
-    expect(fertig.disabled).toBe(false);
-    await fireEvent.click(fertig);
+    const speichern = getByText('Speichern') as HTMLButtonElement;
+    expect(speichern.disabled).toBe(false);
+    await fireEvent.click(speichern);
     await tick();
     await new Promise((r) => setTimeout(r, 30));
     const entry = await db.entries.get('2026-05-28__s1');
@@ -34,29 +36,57 @@ describe('EntryEditor', () => {
     expect(entry?.comment).toBe('');
   });
 
-  it('Fertig is disabled while slider is required and value is null', async () => {
+  it('Speichern is disabled while slider is required and value is null', async () => {
     const inputs = defaultSymptomInputs();
     inputs.slider.enabled = true; inputs.slider.required = true;
     const s = makeSymptom({ inputs });
     const { getByText } = render(EntryEditor, {
       props: { open: true, date: '2026-05-28', symptom: s, onClose: () => {} }
     });
-    const fertig = getByText('Fertig') as HTMLButtonElement;
-    expect(fertig.disabled).toBe(true);
+    const speichern = getByText('Speichern') as HTMLButtonElement;
+    expect(speichern.disabled).toBe(true);
   });
 
-  it('Verwerfen closes without writing an entry', async () => {
+  it('Löschen closes without writing when no entry exists', async () => {
     const s = makeSymptom();
     const onClose = vi.fn();
     const { getByText } = render(EntryEditor, {
       props: { open: true, date: '2026-05-28', symptom: s, onClose }
     });
-    await fireEvent.click(getByText('Verwerfen'));
+    await fireEvent.click(getByText('Löschen'));
     await tick();
-    // onVerwerfen is async (awaits clearDialog); give it a tick to resolve.
     await new Promise((r) => setTimeout(r, 30));
     expect(onClose).toHaveBeenCalled();
     expect(await db.entries.get('2026-05-28__s1')).toBeUndefined();
+    expect(snackbar.current).toBeNull();
+  });
+
+  it('Löschen removes an existing entry and shows an undo snackbar', async () => {
+    const s = makeSymptom({ name: 'Müdigkeit' });
+    await db.entries.put({
+      id: '2026-05-28__s1', date: '2026-05-28', symptomId: 's1',
+      sliderValue: 80, numberValue: null, comment: 'müde',
+      updatedAt: 1
+    });
+    const onClose = vi.fn();
+    const { getByText } = render(EntryEditor, {
+      props: { open: true, date: '2026-05-28', symptom: s, onClose }
+    });
+    await tick();
+    await new Promise((r) => setTimeout(r, 30));
+    await fireEvent.click(getByText('Löschen'));
+    await tick();
+    await new Promise((r) => setTimeout(r, 30));
+    expect(await db.entries.get('2026-05-28__s1')).toBeUndefined();
+    expect(snackbar.current?.message).toBe('Müdigkeit gelöscht');
+    expect(snackbar.current?.actionLabel).toBe('Rückgängig');
+    expect(onClose).toHaveBeenCalled();
+
+    await snackbar.invokeAction();
+    await new Promise((r) => setTimeout(r, 30));
+    const restored = await db.entries.get('2026-05-28__s1');
+    expect(restored?.sliderValue).toBe(80);
+    expect(restored?.comment).toBe('müde');
   });
 
   it('renders only enabled inputs', () => {

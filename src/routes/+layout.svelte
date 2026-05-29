@@ -12,6 +12,12 @@
   // Service-Worker-Update-Hinweis: bei neuem SW Toast „Update verfügbar" mit
   // Reload-Action zeigen. Spec § Offline & PWA.
   onMount(async () => {
+    // Guarantee at least 2s of pulsing before the bomb detonates, no matter
+    // how fast hydration finishes. performance.now() = ms since page-load.
+    const MIN_SPLASH_MS = 2000;
+    const remaining = Math.max(0, MIN_SPLASH_MS - performance.now());
+    setTimeout(() => document.body.classList.add('app-ready'), remaining);
+
     const { registerSW } = await import('virtual:pwa-register');
     const updateSW = registerSW({
       onNeedRefresh() {

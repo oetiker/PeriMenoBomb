@@ -11,7 +11,7 @@ describe('symptoms CRUD', () => {
     const s = await createSymptom({ name: 'Hitzewallungen' });
     expect(s.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(s.name).toBe('Hitzewallungen');
-    expect(s.icon).toBe('circle');
+    expect(s.icon).toBe('⚪');
     expect(s.color).toBe('#6b7280');
     expect(s.tagIds).toEqual([]);
     expect(s.parentId).toBeNull();
@@ -23,7 +23,7 @@ describe('symptoms CRUD', () => {
   it('creates a folder with default folder icon', async () => {
     const f = await createSymptom({ name: 'Körperlich', isFolder: true });
     expect(f.isFolder).toBe(true);
-    expect(f.icon).toBe('folder');
+    expect(f.icon).toBe('📁');
   });
 
   it('honors overrides', async () => {

@@ -24,16 +24,16 @@
   }: Props = $props();
 </script>
 
-<Modal {open} {title} onClose={onCancel}>
+<Modal {open} {title} onClose={onCancel} closeButton={false}>
   <p class="message">{message}</p>
-  <div class="actions">
+  {#snippet footer()}
     <button type="button" class="secondary" onclick={onCancel}>{cancelLabel}</button>
     <button
       type="button"
       class="primary {danger ? 'danger' : ''}"
       onclick={onConfirm}
     >{confirmLabel}</button>
-  </div>
+  {/snippet}
 </Modal>
 
 <style>
@@ -41,13 +41,8 @@
     margin: 0 0 var(--sp-4);
     line-height: 1.4;
   }
-  .actions {
-    display: flex;
-    gap: var(--sp-2);
-  }
   .primary,
   .secondary {
-    flex: 1;
     padding: var(--sp-3);
     border-radius: var(--r-2);
     cursor: pointer;
