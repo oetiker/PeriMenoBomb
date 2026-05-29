@@ -21,7 +21,7 @@
 </script>
 
 <a class="row" href="/day/{entry.date}">
-  <Badge icon={symptom.icon} color={symptom.color} duotone={symptom.duotone ?? true} bg={symptom.bg ?? true} size={24} />
+  <Badge icon={symptom.icon} color={symptom.color} duotone={symptom.duotone ?? true} bg={symptom.bg ?? true} size={20} />
   <div class="text">
     <div class="name">{symptom.name}</div>
     <div class="meta">
