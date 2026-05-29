@@ -1,0 +1,63 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+# Project site lives under https://<user>.github.io/PeriMenoBomb/.
+# BASE_PATH feeds both svelte.config.js (kit.paths.base) and the PWA manifest
+# in vite.config.ts. Change this if the repository is renamed; clear it (or
+# set it to an empty string) for a root / custom-domain deploy.
+env:
+  BASE_PATH: /PeriMenoBomb
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # corepack ships with Node and provisions pnpm from the `packageManager`
+      # field in package.json — no pnpm/action-setup needed. Must run before
+      # setup-node so its `cache: pnpm` can find the pnpm binary.
+      - run: corepack enable
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Paraglide output (src/lib/paraglide/) is gitignored and only produced
+      # by the vite plugin at build/dev time. `pnpm check` and the unit tests
+      # import from it, so compile it explicitly before they run.
+      - run: pnpm exec paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide
+
+      - run: pnpm check
+      - run: pnpm test
+      - run: pnpm build
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

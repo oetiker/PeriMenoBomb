@@ -7,8 +7,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="PeriMenoBomb" />
-    <link rel="icon" href="/favicon.png" type="image/png" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" href="%sveltekit.assets%/favicon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="%sveltekit.assets%/icons/apple-touch-icon.png" />
+    <!-- Static manifest link so the app is installable from the SPA shell.
+         %sveltekit.assets% resolves base-correctly in both index.html and the
+         404.html deep-link fallback. Filename matches vite-plugin-pwa's default. -->
+    <link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
     <title>PeriMenoBomb</title>
     <style>
       html, body { background: #ffffff; }
@@ -87,7 +91,7 @@
   </head>
   <body data-sveltekit-preload-data="hover">
     <div id="app-splash" aria-hidden="true">
-      <img src="/brand.webp" alt="" />
+      <img src="%sveltekit.assets%/brand.webp" alt="" />
       <p class="title">PeriMenoBomb</p>
       <p class="tagline">The Symptom Tracker</p>
     </div>
