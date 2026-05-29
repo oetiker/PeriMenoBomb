@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { todayKey, toDateKey, fromDateKey, isValidDateKey, addDays, formatLong } from './date';
+import { todayKey, toDateKey, fromDateKey, isValidDateKey, addDays, formatLong, daysBetweenKeys } from './date';
 
 describe('date utils', () => {
   beforeEach(() => {
@@ -36,5 +36,24 @@ describe('date utils', () => {
 
   it('formatLong renders German long form', () => {
     expect(formatLong('2026-05-27')).toMatch(/Mi.*27.*Mai.*2026/);
+  });
+
+  it('daysBetweenKeys returns 0 for the same day', () => {
+    expect(daysBetweenKeys('2026-05-27', '2026-05-27')).toBe(0);
+  });
+
+  it('daysBetweenKeys returns signed whole-day difference', () => {
+    expect(daysBetweenKeys('2026-05-29', '2026-05-27')).toBe(2);
+    expect(daysBetweenKeys('2026-05-27', '2026-05-29')).toBe(-2);
+  });
+
+  it('daysBetweenKeys is correct across month and year boundaries', () => {
+    expect(daysBetweenKeys('2027-01-01', '2026-12-31')).toBe(1);
+    expect(daysBetweenKeys('2026-03-01', '2026-02-28')).toBe(1);
+  });
+
+  it('daysBetweenKeys is DST-safe (round, not floor)', () => {
+    // EU DST spring-forward is 2026-03-29; the 29th is a 23h day locally.
+    expect(daysBetweenKeys('2026-03-30', '2026-03-28')).toBe(2);
   });
 });

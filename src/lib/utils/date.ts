@@ -36,3 +36,10 @@ export function formatLong(key: string, locale = 'de-CH'): string {
     year: 'numeric'
   });
 }
+
+/** Whole-day difference a − b for two YYYY-MM-DD keys. Uses round() so DST
+    transitions (23h/25h local days) don't shift the result by one. */
+export function daysBetweenKeys(a: string, b: string): number {
+  const MS_PER_DAY = 86_400_000;
+  return Math.round((fromDateKey(a).getTime() - fromDateKey(b).getTime()) / MS_PER_DAY);
+}
