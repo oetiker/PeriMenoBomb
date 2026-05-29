@@ -8,6 +8,7 @@
     buildHeatmap, valueNumberDomain, cellColor,
     OFFSET_MIN, OFFSET_MAX, MAX_ANCHOR_COLUMNS
   } from '$lib/report/heatmap';
+  import { tickPositions, clampTranslate, zoomAt, type Tick } from '$lib/report/heatmap-view';
   import type { Entry, Symptom } from '$lib/db';
 
   const CELL_W = 30;
@@ -76,12 +77,87 @@
   const plotW = $derived(model ? model.columns.length * CELL_W : 0);
   const plotH = $derived(model ? model.offsets.length * CELL_H : 0);
 
-  // Static transform for now; Task C5 makes scale/tx/ty interactive.
-  const scale = 1, tx = 8, ty = 8;
+  const MIN_SCALE = 0.5, MAX_SCALE = 4, MARGIN = 40;
+  let scale = $state(1);
+  let tx = $state(8);
+  let ty = $state(8);
+
+  // Viewport size (measured); ticks/cull depend on it.
+  let vpW = $state(0);
+  let vpH = $state(0);
+  let viewportEl = $state<HTMLElement | undefined>();
+  $effect(() => {
+    if (!viewportEl) return;
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0].contentRect;
+      vpW = r.width; vpH = r.height;
+    });
+    ro.observe(viewportEl);
+    return () => ro.disconnect();
+  });
+
+  // Re-center vertically on the day-0 row the first time we have a model + size.
+  let centered = $state(false);
+  $effect(() => {
+    if (centered || !model || vpH === 0) return;
+    centered = true;
+    ty = vpH * 0.4 - (model.zeroIndex * CELL_H + CELL_H / 2) * scale;
+    ty = clampTranslate(ty, scale, plotH, vpH, MARGIN);
+  });
+
+  const colTicks = $derived<Tick[]>(model ? tickPositions(model.columns.length, CELL_W, scale, tx, vpW, 44) : []);
+  const rowTicks = $derived<Tick[]>(model ? tickPositions(model.offsets.length, CELL_H, scale, ty, vpH, 16) : []);
+
+  function applyZoom(factor: number, fx: number, fy: number) {
+    const z = zoomAt({ scale, tx, ty }, factor, fx, fy, MIN_SCALE, MAX_SCALE);
+    scale = z.scale;
+    tx = clampTranslate(z.tx, scale, plotW, vpW, MARGIN);
+    ty = clampTranslate(z.ty, scale, plotH, vpH, MARGIN);
+  }
+  function zoomBtn(factor: number) { applyZoom(factor, vpW / 2, vpH / 2); }
+  function resetView() {
+    scale = 1; tx = 8;
+    ty = model ? clampTranslate(vpH * 0.4 - (model.zeroIndex * CELL_H + CELL_H / 2), 1, plotH, vpH, MARGIN) : 8;
+    centered = false;
+  }
+
+  function onWheel(e: WheelEvent) {
+    e.preventDefault();
+    const r = viewportEl!.getBoundingClientRect();
+    applyZoom(e.deltaY < 0 ? 1.1 : 0.9, e.clientX - r.left, e.clientY - r.top);
+  }
+
+  const pts = new Map<number, { x: number; y: number }>();
+  let pinchDist = 0;
+  function onPointerDown(e: PointerEvent) { (e.target as HTMLElement).setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); }
+  function onPointerMove(e: PointerEvent) {
+    if (!pts.has(e.pointerId)) return;
+    const prev = pts.get(e.pointerId)!;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 1) {
+      tx = clampTranslate(tx + (e.clientX - prev.x), scale, plotW, vpW, MARGIN);
+      ty = clampTranslate(ty + (e.clientY - prev.y), scale, plotH, vpH, MARGIN);
+    } else if (pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      const nd = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinchDist) {
+        const r = viewportEl!.getBoundingClientRect();
+        applyZoom(nd / pinchDist, (a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top);
+      }
+      pinchDist = nd;
+    }
+  }
+  function onPointerUp(e: PointerEvent) { pts.delete(e.pointerId); if (pts.size < 2) pinchDist = 0; }
 </script>
 
 <section class="cycle">
   <h1>Zyklus-Heatmap</h1>
+
+  <div class="zoombar">
+    <button type="button" onclick={() => zoomBtn(0.83)} aria-label="kleiner">−</button>
+    <button type="button" onclick={() => zoomBtn(1.2)} aria-label="größer">+</button>
+    <button type="button" onclick={resetView} aria-label="zurücksetzen">⟳</button>
+  </div>
 
   <div class="selectors">
     <label><span class="cap">Anker</span>
@@ -107,18 +183,28 @@
       <div class="corner"></div>
       <!-- top gutter: column (anchor) date labels -->
       <div class="topgutter" data-topgutter>
-        {#each model.columns as col, i (col.anchorDate)}
-          <span class="collabel" style="left: {tx + (i * CELL_W + CELL_W / 2) * scale}px;">{formatLong(col.anchorDate)}</span>
+        {#each colTicks as t (t.index)}
+          <span class="collabel" style="left: {t.pos}px;">{formatLong(model.columns[t.index].anchorDate)}</span>
         {/each}
       </div>
       <!-- left gutter: day-offset labels -->
       <div class="leftgutter" data-leftgutter>
-        {#each model.offsets as off, j (off)}
-          <span class="offlabel {off === 0 ? 'zero' : ''}" style="top: {ty + (j * CELL_H + CELL_H / 2) * scale}px;">{off > 0 ? '+' : ''}{off}</span>
+        {#each rowTicks as t (t.index)}
+          <span class="offlabel {model.offsets[t.index] === 0 ? 'zero' : ''}" style="top: {t.pos}px;">{model.offsets[t.index] > 0 ? '+' : ''}{model.offsets[t.index]}</span>
         {/each}
       </div>
       <!-- plot viewport -->
-      <div class="viewport" data-viewport>
+      <div
+        class="viewport" data-viewport
+        role="application"
+        aria-label="Heatmap-Bereich (verschieben und zoomen)"
+        bind:this={viewportEl}
+        onwheel={onWheel}
+        onpointerdown={onPointerDown}
+        onpointermove={onPointerMove}
+        onpointerup={onPointerUp}
+        onpointercancel={onPointerUp}
+      >
         <div class="plot" style="transform: translate({tx}px, {ty}px) scale({scale}); width: {plotW}px; height: {plotH}px;">
           <!-- day-0 band -->
           <div class="zeroline" style="top: {model.zeroIndex * CELL_H}px; height: {CELL_H - GAP}px; width: {plotW}px;"></div>
@@ -179,4 +265,6 @@
   .legend span { display: inline-flex; align-items: center; gap: 5px; }
   .legend i { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
   .legend .zero-swatch { box-shadow: inset 0 0 0 2px rgba(31,41,55,0.5); }
+  .zoombar { display: flex; gap: var(--sp-2); }
+  .zoombar button { width: 36px; height: 36px; border: 1px solid var(--c-border); background: var(--c-surface); border-radius: var(--r-2); font-size: 18px; cursor: pointer; }
 </style>
