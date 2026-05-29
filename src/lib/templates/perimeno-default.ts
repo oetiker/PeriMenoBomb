@@ -23,6 +23,9 @@ const number = (unit: string, integer = true): Partial<SymptomInputs> => ({
   number:  { enabled: true, required: true, unit, integer },
   comment: { enabled: true, required: false }
 });
+const event = (): Partial<SymptomInputs> => ({
+  comment: { enabled: true, required: false }
+});
 
 export const DEFAULT_TEMPLATE: Template = {
   tags: [
@@ -32,6 +35,13 @@ export const DEFAULT_TEMPLATE: Template = {
     { name: 'hormonell' }
   ],
   roots: [
+    {
+      name: 'Zyklus', icon: '🩸', color: '#be123c',
+      children: [
+        { name: 'Start Mens', icon: '🔴', color: '#be123c', tags: ['hormonell'], inputs: event() },
+        { name: 'Ende Mens',  icon: '🏁', color: '#be123c', tags: ['hormonell'], inputs: event() }
+      ]
+    },
     {
       name: 'Körperlich', icon: '🏃', color: '#10b981',
       children: [
