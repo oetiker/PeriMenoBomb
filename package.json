@@ -40,6 +40,8 @@
   },
   "dependencies": {
     "@lucide/svelte": "^1.16.0",
-    "dexie": "^4.4.2"
+    "dexie": "^4.4.2",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8"
   }
 }
