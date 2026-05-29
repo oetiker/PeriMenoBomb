@@ -39,8 +39,9 @@ export function emojiDuotoneFilter(hex: string): string {
   const { h, l } = hexToHsl(hex);
   // sepia anchors the hue near 50°. Rotate the gap to land on the user's hue.
   // Brightness drops slightly for very light targets to keep the glyph readable
-  // on a tinted background.
+  // on a tinted background. saturate(4) + contrast(0.8) keeps the duotone
+  // recognisable without lighting up on iOS HDR displays.
   const rot = Math.round(h - 50);
   const bright = l > 0.6 ? 0.75 : 0.85;
-  return `grayscale(1) brightness(${bright}) sepia(1) saturate(12) hue-rotate(${rot}deg)`;
+  return `grayscale(1) brightness(${bright}) sepia(1) saturate(4) hue-rotate(${rot}deg) contrast(0.8)`;
 }

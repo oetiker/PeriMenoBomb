@@ -26,14 +26,15 @@
   }: Props = $props();
 
   const filter = $derived(duotone ? emojiDuotoneFilter(color) : 'none');
-  // Tinted background only when bg is on. 18% of the chosen colour over the
+  // Tinted background only when bg is on. 40% of the chosen colour over the
   // surface reads as "this thing's colour is X" without clashing with the
   // glyph in either duotone or native mode.
-  const background = $derived(bg ? `color-mix(in srgb, ${color} 18%, var(--c-surface))` : 'transparent');
+  const background = $derived(bg ? `color-mix(in srgb, ${color} 40%, var(--c-surface))` : 'transparent');
   // Without the framing disc the glyph needs to grow to fill the visual slot
-  // it used to occupy. 0.95 ≈ edge-to-edge, 0.6 ≈ same body weight as a
-  // duotone-tinted lucide icon used to have inside the circle.
-  const glyph = $derived(Math.round(size * (bg ? 0.6 : 0.95)));
+  // it used to occupy. 0.95 ≈ edge-to-edge. 0.5 leaves enough air between the
+  // emoji's rendered glyph (which extends ~20% beyond its font-size box for
+  // Apple/Noto/Segoe Color Emoji) and the disc edge.
+  const glyph = $derived(Math.round(size * (bg ? 0.5 : 0.95)));
 </script>
 
 <span
@@ -51,11 +52,17 @@
     justify-content: center;
     border-radius: 50%;
     flex-shrink: 0;
-    overflow: hidden;
+    /* No overflow clipping: the bg fills the border-radius circle natively
+       with consistent anti-aliasing. Glyph is sized small enough to not
+       extend past the disc edge, so no mask is needed. */
   }
   .emoji {
     line-height: 1;
     /* Apple Color Emoji etc. — system font picks the colour table. */
     font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', system-ui, sans-serif;
+    /* Color-emoji fonts have ascender > descender, so the rendered glyph sits
+       ~0.5px above the line-box centre. Nudge it down so the visible glyph
+       lines up with the geometric disc centre. */
+    transform: translateY(0.03em);
   }
 </style>
