@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDatabase } from './index';
 import type { Symptom } from './index';
 import { defaultSymptomInputs } from './index';
-import { upsertEntry, getEntry, deleteEntry, listEntriesForDate, listEntriesForRange, hasEntry } from './entries';
+import { upsertEntry, getEntry, deleteEntry, listEntriesForDate, listEntriesForRange, hasEntry, listOccurrenceDates } from './entries';
 import { validateEntry } from './entries';
 
 describe('entries', () => {
@@ -53,6 +53,23 @@ describe('entries', () => {
 
   it('rejects invalid date format', async () => {
     await expect(upsertEntry({ date: '27.05.2026', symptomId: 'x' })).rejects.toThrow();
+  });
+
+  it('listOccurrenceDates returns ascending dates for a symptom', async () => {
+    await upsertEntry({ date: '2026-05-20', symptomId: 'a' });
+    await upsertEntry({ date: '2026-05-10', symptomId: 'a' });
+    await upsertEntry({ date: '2026-05-15', symptomId: 'b' });
+    expect(await listOccurrenceDates('a')).toEqual(['2026-05-10', '2026-05-20']);
+    expect(await listOccurrenceDates('b')).toEqual(['2026-05-15']);
+  });
+
+  it('listOccurrenceDates returns empty array when the symptom has no entries', async () => {
+    expect(await listOccurrenceDates('nope')).toEqual([]);
+  });
+
+  it('listOccurrenceDates counts an input-less event entry as an occurrence', async () => {
+    await upsertEntry({ date: '2026-05-18', symptomId: 'mens' }); // no slider/number/comment
+    expect(await listOccurrenceDates('mens')).toEqual(['2026-05-18']);
   });
 });
 

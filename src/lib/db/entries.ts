@@ -69,3 +69,13 @@ export function validateEntry(symptom: Symptom, entry: EntryFieldsLike): EntryVa
   if (i.comment.enabled && i.comment.required && entry.comment.trim().length === 0) missing.push('comment');
   return { ok: missing.length === 0, missing };
 }
+
+/** Distinct dates (YYYY-MM-DD), ascending, on which an entry row exists for the
+    symptom. The single source of truth for "an occurrence of symptom X",
+    consumed by the cycle heatmap (columns) and the since-view (intervals). One
+    entry per (date, symptom) is guaranteed by entryKey, so dates are unique and
+    a lexical sort is chronological. An input-less event row still counts. */
+export async function listOccurrenceDates(symptomId: string): Promise<string[]> {
+  const rows = await db.entries.where('symptomId').equals(symptomId).toArray();
+  return rows.map((e) => e.date).sort();
+}
