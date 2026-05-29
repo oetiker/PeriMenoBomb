@@ -4,6 +4,7 @@
   import { setMeta } from '$lib/db/meta';
   import { snackbar } from '$lib/stores/snackbar.svelte';
   import { goto } from '$app/navigation';
+  import { base } from '$app/paths';
 
   async function useTemplate() {
     try {
@@ -16,7 +17,7 @@
   }
   async function buildOwn() {
     await setMeta('firstRunCompleted', true);
-    await goto('/symptoms', { replaceState: true });
+    await goto(`${base}/symptoms`, { replaceState: true });
   }
 </script>
 

@@ -1,18 +1,19 @@
 <script lang="ts">
   import { ChartLine, CalendarClock, ClipboardList } from '@lucide/svelte';
+  import { base } from '$app/paths';
 </script>
 
 <section class="report-hub">
   <h1>Verlauf</h1>
-  <a class="card" href="/report/cycle">
+  <a class="card" href="{base}/report/cycle">
     <ChartLine size={24} />
     <div><h2>Zyklus-Heatmap</h2><p>Symptom-Intensität relativ zu einem Ereignis</p></div>
   </a>
-  <a class="card" href="/report/since">
+  <a class="card" href="{base}/report/since">
     <CalendarClock size={24} />
     <div><h2>Tage seit letztem Symptom</h2><p>Zähler + Abstände zwischen Erfassungen</p></div>
   </a>
-  <a class="card" href="/report/list">
+  <a class="card" href="{base}/report/list">
     <ClipboardList size={24} />
     <div><h2>Ereignis-Liste</h2><p>Alle Einträge, filterbar, als PDF</p></div>
   </a>

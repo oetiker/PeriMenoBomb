@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { base } from '$app/paths';
   import { todayKey } from '$lib/utils/date';
   import { exportAll, importAll, downloadJson, readFileAsText, validateExportPayload, type ExportPayload } from '$lib/utils/transfer';
   import { importTemplate } from '$lib/templates/import';
   import { DEFAULT_TEMPLATE } from '$lib/templates/perimeno-default';
+  import { loadTestData } from '$lib/dev/testdata';
   import { db } from '$lib/db';
   import { setMeta } from '$lib/db/meta';
   import { snackbar } from '$lib/stores/snackbar.svelte';
@@ -72,6 +74,21 @@
     }
   }
 
+  let loadingTestData = $state(false);
+  async function onLoadTestData() {
+    if (loadingTestData) return;
+    loadingTestData = true;
+    try {
+      const res = await loadTestData();
+      await setMeta('firstRunCompleted', true);
+      snackbar.show({ message: `Testdaten geladen: ${res.cycles} Zyklen, ${res.entries} Einträge.` });
+    } catch (err) {
+      snackbar.show({ message: `Testdaten konnten nicht geladen werden: ${(err as Error).message}` });
+    } finally {
+      loadingTestData = false;
+    }
+  }
+
   async function runWipe() {
     wipeStep = 0;
     await db.transaction('rw', db.symptoms, db.tags, db.entries, db.meta, async () => {
@@ -109,7 +126,15 @@
 
 <section>
   <h2>Tags</h2>
-  <p><a href="/tags">Tag-Verwaltung öffnen</a></p>
+  <p><a href="{base}/tags">Tag-Verwaltung öffnen</a></p>
+</section>
+
+<section>
+  <h2>Testdaten</h2>
+  <p>Beispiel-Daten zum Ausprobieren laden (Vorlage + ~6 Zyklen mit PMS-Kopfweh und täglichen Symptomen). Bestehende gleichdatierte Einträge werden überschrieben.</p>
+  <button type="button" onclick={onLoadTestData} disabled={loadingTestData}>
+    {loadingTestData ? 'Lädt…' : 'Testdaten laden'}
+  </button>
 </section>
 
 <section>

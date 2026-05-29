@@ -1,5 +1,6 @@
 <script lang="ts">
   import Badge from '$lib/components/ui/Badge.svelte';
+  import { base } from '$app/paths';
   import type { Entry, Symptom } from '$lib/db';
 
   type Props = { entry: Entry; symptom: Symptom; tagNames: string[] };
@@ -20,7 +21,7 @@
   const showComment = $derived(symptom.inputs.comment.enabled && entry.comment.trim().length > 0);
 </script>
 
-<a class="row" href="/day/{entry.date}">
+<a class="row" href="{base}/day/{entry.date}">
   <Badge icon={symptom.icon} color={symptom.color} duotone={symptom.duotone ?? true} bg={symptom.bg ?? true} size={20} />
   <div class="text">
     <div class="name">{symptom.name}</div>
