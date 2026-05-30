@@ -31,6 +31,36 @@ export function valueNumberDomain(entries: Entry[], valueSymptom: Symptom): Numb
   return { min: Math.min(...nums), max: Math.max(...nums) };
 }
 
+/** Numeric weight of the option an entry selected, or null when the symptom is
+    not a select, nothing was chosen, or the chosen option has no value. Deleted
+    options still resolve — their value is kept — so historical intensity is
+    preserved even after the option is removed from the live dropdown. */
+export function selectEntryValue(valueSymptom: Symptom, entry: Entry): number | null {
+  const opts = valueSymptom.inputs.select?.options;
+  if (!opts || entry.selectKey === null || entry.selectKey === undefined) return null;
+  const opt = opts.find((o) => o.key === entry.selectKey);
+  if (!opt || opt.value === null || opt.value === undefined || Number.isNaN(opt.value)) return null;
+  return opt.value;
+}
+
+/** Stable normalization domain over a select symptom's option values. */
+export function selectValueDomain(entries: Entry[], valueSymptom: Symptom): NumberDomain | null {
+  if (!valueSymptom.inputs.select?.enabled) return null;
+  const nums = entries
+    .map((e) => selectEntryValue(valueSymptom, e))
+    .filter((v): v is number => v !== null);
+  if (nums.length === 0) return null;
+  return { min: Math.min(...nums), max: Math.max(...nums) };
+}
+
+/** Pick the right normalization domain for whichever value-bearing input the
+    focus symptom uses (number or select). */
+export function valueDomain(entries: Entry[], valueSymptom: Symptom): NumberDomain | null {
+  if (valueSymptom.inputs.number.enabled) return valueNumberDomain(entries, valueSymptom);
+  if (valueSymptom.inputs.select?.enabled) return selectValueDomain(entries, valueSymptom);
+  return null;
+}
+
 export function classifyCell(valueSymptom: Symptom, entry: Entry | undefined, domain: NumberDomain | null): Cell {
   if (!entry) return NONE;
   const i = valueSymptom.inputs;
@@ -42,6 +72,14 @@ export function classifyCell(valueSymptom: Symptom, entry: Entry | undefined, do
   if (i.number.enabled && entry.numberValue !== null && !Number.isNaN(entry.numberValue)) {
     if (!domain || domain.max === domain.min) return { kind: 'value', intensity: 1 };
     const t = (entry.numberValue - domain.min) / (domain.max - domain.min);
+    return { kind: 'value', intensity: Math.max(0, Math.min(1, t)) };
+  }
+  if (i.select?.enabled) {
+    if (entry.selectKey === null || entry.selectKey === undefined) return { kind: 'unspez', intensity: 0 };
+    const v = selectEntryValue(valueSymptom, entry);
+    if (v === null) return { kind: 'recorded', intensity: 1 };
+    if (!domain || domain.max === domain.min) return { kind: 'value', intensity: 1 };
+    const t = (v - domain.min) / (domain.max - domain.min);
     return { kind: 'value', intensity: Math.max(0, Math.min(1, t)) };
   }
   return { kind: 'recorded', intensity: 1 };

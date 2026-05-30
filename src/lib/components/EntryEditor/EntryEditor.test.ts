@@ -119,7 +119,7 @@ describe('EntryEditor', () => {
         open: true,
         date: '2026-05-28',
         symptom: s,
-        initial: { sliderValue: 42, numberValue: null, comment: 'restored' },
+        initial: { sliderValue: 42, numberValue: null, comment: 'restored', selectKey: null },
         onClose: () => {}
       }
     });

@@ -1,7 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Dexie from 'dexie';
 import 'fake-indexeddb/auto';
-import { defaultSymptomInputs, upgradeV1toV2 } from './index';
+import { defaultSymptomInputs, upgradeV1toV2, upgradeV4toV5 } from './index';
+
+const STORES = {
+  symptoms: 'id, parentId, [parentId+sortIndex], archived',
+  tags:     'id, name',
+  entries:  'id, date, symptomId, [date+symptomId]',
+  meta:     'key'
+};
 
 const DB_NAME = 'perimenobomb-migrationtest';
 
@@ -66,5 +73,38 @@ describe('Dexie schema v1 → v2 upgrade', () => {
     const od = await v2.table('meta').get('openDialog');
     expect(od).toBeUndefined();
     v2.close();
+  });
+});
+
+describe('Dexie schema v4 → v5 upgrade', () => {
+  beforeEach(deleteDb);
+
+  it('backfills a disabled+empty select block on existing symptoms', async () => {
+    // Seed a v4-shaped symptom whose inputs lack the select block.
+    const v4 = new Dexie(DB_NAME);
+    v4.version(4).stores(STORES);
+    await v4.open();
+    await v4.table('symptoms').add({
+      id: 's1', name: 'Old', color: '#000', icon: '⚪',
+      tagIds: [], parentId: null, sortIndex: 0, depth: 0,
+      isFolder: false, archived: false, createdAt: 1, updatedAt: 1,
+      daily: false, duotone: true, bg: true,
+      inputs: {
+        slider:  { enabled: false, required: false, lowLabel: '', highLabel: '' },
+        number:  { enabled: false, required: false, unit: '', integer: true },
+        comment: { enabled: false, required: false }
+        // NB: no select — v4 shape
+      }
+    });
+    v4.close();
+
+    const v5 = new Dexie(DB_NAME);
+    v5.version(4).stores(STORES);
+    v5.version(5).stores(STORES).upgrade(upgradeV4toV5);
+    await v5.open();
+
+    const sym = await v5.table('symptoms').get('s1');
+    expect(sym.inputs.select).toEqual({ enabled: false, required: false, options: [] });
+    v5.close();
   });
 });

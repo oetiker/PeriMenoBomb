@@ -2,6 +2,7 @@
   import Badge from '$lib/components/ui/Badge.svelte';
   import SwipeRow from '$lib/components/ui/SwipeRow.svelte';
   import { MessageCircle } from '@lucide/svelte';
+  import { selectLabelFor } from '$lib/db/entries';
   import type { Symptom, Entry } from '$lib/db';
 
   type Props = { entry: Entry; symptom: Symptom; onTap: () => void; onSwipe: () => void };
@@ -21,6 +22,8 @@
     return unit ? `${entry.numberValue} ${unit}` : String(entry.numberValue);
   });
 
+  const selectText = $derived(selectLabelFor(symptom, entry));
+
   const showComment = $derived(symptom.inputs.comment.enabled && entry.comment.trim().length > 0);
 </script>
 
@@ -32,8 +35,9 @@
       <div class="meta">
         {#if sliderText}<span class="slider">{sliderText}</span>{/if}
         {#if numberText}<span class="number">{numberText}</span>{/if}
+        {#if selectText}<span class="select">{selectText}</span>{/if}
         {#if showComment}<MessageCircle size={14} />{/if}
-        {#if !sliderText && !numberText && !showComment}<span class="empty">erfasst</span>{/if}
+        {#if !sliderText && !numberText && !selectText && !showComment}<span class="empty">erfasst</span>{/if}
       </div>
     </div>
   </button>

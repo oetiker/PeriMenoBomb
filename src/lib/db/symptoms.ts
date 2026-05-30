@@ -203,7 +203,7 @@ export async function reorderSiblings(parentId: string | null, orderedIds: strin
 }
 
 export function hasEnabledInput(inputs: SymptomInputs): boolean {
-  return inputs.slider.enabled || inputs.number.enabled || inputs.comment.enabled;
+  return inputs.slider.enabled || inputs.number.enabled || inputs.comment.enabled || (inputs.select?.enabled ?? false);
 }
 
 function flattenTreeOrder(tree: TreeNode[]): Symptom[] {

@@ -7,6 +7,7 @@ export interface UpsertEntryInput {
   sliderValue?: number | null;
   numberValue?: number | null;
   comment?: string;
+  selectKey?: string | null;
 }
 
 export async function upsertEntry(input: UpsertEntryInput): Promise<Entry> {
@@ -22,6 +23,7 @@ export async function upsertEntry(input: UpsertEntryInput): Promise<Entry> {
     sliderValue: input.sliderValue !== undefined ? input.sliderValue : existing?.sliderValue ?? null,
     numberValue: input.numberValue !== undefined ? input.numberValue : existing?.numberValue ?? null,
     comment:     input.comment     !== undefined ? input.comment     : existing?.comment     ?? '',
+    selectKey:   input.selectKey   !== undefined ? input.selectKey   : existing?.selectKey   ?? null,
     updatedAt:   Date.now()
   };
   await db.entries.put(merged);
@@ -48,7 +50,22 @@ export async function listEntriesForRange(fromDate: string, toDate: string): Pro
   return db.entries.where('date').between(fromDate, toDate, true, true).toArray();
 }
 
-export type EntryValidationField = 'slider' | 'number' | 'comment';
+/** Human-readable label for an entry's select choice, or '' when the symptom
+    is not a select or nothing was chosen. A soft-deleted option still resolves
+    (so historical logs stay legible) and is suffixed with "(gelöscht)"; a key
+    with no matching option at all shows a neutral placeholder. */
+export function selectLabelFor(symptom: Symptom, entry: { selectKey?: string | null }): string {
+  const sel = symptom.inputs.select;
+  if (!sel?.enabled) return '';
+  const key = entry.selectKey;
+  if (key === null || key === undefined) return '';
+  const opt = sel.options.find((o) => o.key === key);
+  if (!opt) return '(unbekannte Auswahl)';
+  const label = opt.label || '(ohne Name)';
+  return opt.deleted ? `${label} (gelöscht)` : label;
+}
+
+export type EntryValidationField = 'slider' | 'number' | 'comment' | 'select';
 
 export interface EntryValidationResult {
   ok: boolean;
@@ -59,6 +76,7 @@ export interface EntryFieldsLike {
   sliderValue: number | null;
   numberValue: number | null;
   comment: string;
+  selectKey?: string | null;
 }
 
 export function validateEntry(symptom: Symptom, entry: EntryFieldsLike): EntryValidationResult {
@@ -67,6 +85,7 @@ export function validateEntry(symptom: Symptom, entry: EntryFieldsLike): EntryVa
   if (i.slider.enabled && i.slider.required && entry.sliderValue === null) missing.push('slider');
   if (i.number.enabled && i.number.required && (entry.numberValue === null || Number.isNaN(entry.numberValue))) missing.push('number');
   if (i.comment.enabled && i.comment.required && entry.comment.trim().length === 0) missing.push('comment');
+  if (i.select?.enabled && i.select.required && (entry.selectKey === null || entry.selectKey === undefined)) missing.push('select');
   return { ok: missing.length === 0, missing };
 }
 

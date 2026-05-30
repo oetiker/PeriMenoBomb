@@ -18,7 +18,7 @@
   let sheetOpen = $state(false);
   let editing = $state<{ symptom: Symptom } | null>(null);
   let restoreInitial = $state<
-    | { sliderValue: number | null; numberValue: number | null; comment: string; workingDate: string }
+    | { sliderValue: number | null; numberValue: number | null; comment: string; selectKey: string | null; workingDate: string }
     | null
   >(null);
 
@@ -53,6 +53,7 @@
       sliderValue: r.payload.sliderValue,
       numberValue: r.payload.numberValue,
       comment: r.payload.comment,
+      selectKey: r.payload.selectKey,
       workingDate: r.payload.date
     };
   });
@@ -75,7 +76,7 @@
       date={restoreInitial?.workingDate ?? currentDate.value}
       symptom={liveSymptom}
       initial={restoreInitial
-        ? { sliderValue: restoreInitial.sliderValue, numberValue: restoreInitial.numberValue, comment: restoreInitial.comment }
+        ? { sliderValue: restoreInitial.sliderValue, numberValue: restoreInitial.numberValue, comment: restoreInitial.comment, selectKey: restoreInitial.selectKey }
         : undefined}
       onClose={() => { editing = null; restoreInitial = null; }}
     />

@@ -4,6 +4,7 @@
   import Badge from '$lib/components/ui/Badge.svelte';
   import SliderInput from './SliderInput.svelte';
   import NumberInput from './NumberInput.svelte';
+  import SelectInput from './SelectInput.svelte';
   import SymptomEditModal from '$lib/components/SymptomAdmin/SymptomEditModal.svelte';
   import { upsertEntry, getEntry, deleteEntry, validateEntry } from '$lib/db/entries';
   import type { Symptom } from '$lib/db';
@@ -19,7 +20,7 @@
     date: string;
     symptom: Symptom;
     /** Optional initial values when restoring from openDialog. */
-    initial?: { sliderValue: number | null; numberValue: number | null; comment: string };
+    initial?: { sliderValue: number | null; numberValue: number | null; comment: string; selectKey: string | null };
     onClose: () => void;
   };
   let { open, date, symptom, initial, onClose }: Props = $props();
@@ -28,6 +29,7 @@
   let sliderValue = $state<number | null>(untrack(() => initial?.sliderValue ?? null));
   let numberValue = $state<number | null>(untrack(() => initial?.numberValue ?? null));
   let comment = $state(untrack(() => initial?.comment ?? ''));
+  let selectKey = $state<string | null>(untrack(() => initial?.selectKey ?? null));
   let configOpen = $state(false);
 
   // Load existing entry once on open. If `initial` is provided (restore path), skip — restored values win.
@@ -41,10 +43,12 @@
         sliderValue = e.sliderValue;
         numberValue = e.numberValue;
         comment = e.comment;
+        selectKey = e.selectKey ?? null;
       } else {
         sliderValue = null;
         numberValue = null;
         comment = '';
+        selectKey = null;
       }
     })();
   });
@@ -68,7 +72,8 @@
       symptomId: symptom.id,
       sliderValue,
       numberValue,
-      comment
+      comment,
+      selectKey
     }));
     void persistDialog({
       kind: 'entry-editor',
@@ -79,17 +84,17 @@
 
   $effect(() => {
     if (!open) return;
-    void updateDialogPayload({ date: workingDate, sliderValue, numberValue, comment });
+    void updateDialogPayload({ date: workingDate, sliderValue, numberValue, comment, selectKey });
   });
 
-  const validation = $derived(validateEntry(symptom, { sliderValue, numberValue, comment }));
+  const validation = $derived(validateEntry(symptom, { sliderValue, numberValue, comment, selectKey }));
 
   async function onSave() {
     if (!validation.ok) return;
     await upsertEntry({
       date: workingDate,
       symptomId: symptom.id,
-      sliderValue, numberValue, comment
+      sliderValue, numberValue, comment, selectKey
     });
     await clearDialog();
     onClose();
@@ -113,7 +118,8 @@
             symptomId: existing.symptomId,
             sliderValue: existing.sliderValue,
             numberValue: existing.numberValue,
-            comment: existing.comment
+            comment: existing.comment,
+            selectKey: existing.selectKey ?? null
           });
         }
       });
@@ -147,7 +153,7 @@
       payload: {
         date: workingDate,
         symptomId: symptom.id,
-        sliderValue, numberValue, comment
+        sliderValue, numberValue, comment, selectKey
       }
     });
   }
@@ -200,6 +206,20 @@
         unit={symptom.inputs.number.unit}
         integer={symptom.inputs.number.integer}
         onChange={(v) => (numberValue = v)}
+      />
+    </section>
+  {/if}
+
+  {#if symptom.inputs.select?.enabled}
+    <section>
+      <div class="caption">
+        Auswahl
+        {#if symptom.inputs.select.required}<span class="req">*</span>{/if}
+      </div>
+      <SelectInput
+        value={selectKey}
+        options={symptom.inputs.select.options}
+        onChange={(k) => (selectKey = k)}
       />
     </section>
   {/if}

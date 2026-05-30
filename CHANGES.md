@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] — v1.1 report views
 
 ### Added
+- **Select input for symptoms** — a single-choice dropdown with author-defined
+  options. Each option carries a stable uuid `key` (stored on the log, so
+  renaming a label never breaks historical continuity) plus an optional numeric
+  value that feeds the cycle-heatmap intensity. Options are soft-deleted
+  (hidden from the live dropdown, kept for past entries, restorable). Dexie
+  schema **v5** backfills the new field on existing symptoms.
+
 - **Cycle heatmap** (`/report/cycle`) — per-symptom intensity over time on a
   fixed-axis grid with pan/zoom/pinch and a day-0 reference line.
 - **"Days since last symptom" view** (`/report/since`) — counters plus the

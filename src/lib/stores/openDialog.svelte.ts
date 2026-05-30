@@ -10,6 +10,7 @@ export type OpenDialogState =
         sliderValue: number | null;
         numberValue: number | null;
         comment: string;
+        selectKey: string | null;
       };
     }
   | {

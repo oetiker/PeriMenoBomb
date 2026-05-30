@@ -29,9 +29,9 @@ describe('SymptomEditModal', () => {
       props: { open: true, symptom: sym, isNew: false, onClose }
     });
 
-    // Toggle comment Aktiv (3rd of three Aktiv checkboxes).
+    // Toggle comment Aktiv (4th Aktiv checkbox: slider, number, select, comment).
     const aktiv = getAllByLabelText('Aktiv') as HTMLInputElement[];
-    await fireEvent.click(aktiv[2]);
+    await fireEvent.click(aktiv[3]);
 
     // Daily becomes visible; tick it.
     const daily = getByLabelText('Täglich erfassen');

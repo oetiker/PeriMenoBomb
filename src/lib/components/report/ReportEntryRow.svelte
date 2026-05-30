@@ -1,6 +1,7 @@
 <script lang="ts">
   import Badge from '$lib/components/ui/Badge.svelte';
   import { base } from '$app/paths';
+  import { selectLabelFor } from '$lib/db/entries';
   import type { Entry, Symptom } from '$lib/db';
 
   type Props = { entry: Entry; symptom: Symptom; tagNames: string[] };
@@ -18,6 +19,7 @@
     const unit = symptom.inputs.number.unit;
     return unit ? `${entry.numberValue} ${unit}` : String(entry.numberValue);
   });
+  const selectText = $derived(selectLabelFor(symptom, entry));
   const showComment = $derived(symptom.inputs.comment.enabled && entry.comment.trim().length > 0);
 </script>
 
@@ -28,8 +30,9 @@
     <div class="meta">
       {#if sliderText}<span>{sliderText}</span>{/if}
       {#if numberText}<span>{numberText}</span>{/if}
+      {#if selectText}<span>{selectText}</span>{/if}
       {#if showComment}<span class="comment">{entry.comment}</span>{/if}
-      {#if !sliderText && !numberText && !showComment}<span class="empty">erfasst</span>{/if}
+      {#if !sliderText && !numberText && !selectText && !showComment}<span class="empty">erfasst</span>{/if}
     </div>
     {#if tagNames.length}<div class="tags">{#each tagNames as t}<span class="chip">{t}</span>{/each}</div>{/if}
   </div>
