@@ -9,7 +9,8 @@ function mergeInputs(partial?: Partial<SymptomInputs>): SymptomInputs {
   return {
     slider:  { ...base.slider,  ...(partial.slider  ?? {}) },
     number:  { ...base.number,  ...(partial.number  ?? {}) },
-    comment: { ...base.comment, ...(partial.comment ?? {}) }
+    comment: { ...base.comment, ...(partial.comment ?? {}) },
+    select:  { ...base.select!, ...(partial.select  ?? {}) }
   };
 }
 

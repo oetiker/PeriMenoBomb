@@ -1,4 +1,5 @@
-import type { Symptom, Tag } from '$lib/db';
+import type { Symptom, Tag, Entry } from '$lib/db';
+import { selectLabelFor } from '$lib/db/entries';
 import type { DayGroup } from './filter';
 
 export interface PdfRow {
@@ -14,10 +15,14 @@ export interface PdfHeader {
   generatedLabel: string;
 }
 
-function sliderCell(s: Symptom, v: number | null): string {
-  if (!s.inputs.slider.enabled) return '';
-  if (v === null) return 'unspez';
-  return String(v);
+/** First value column: slider intensity and/or the chosen select label. A
+    symptom usually uses one or the other; if it has both, they're joined. */
+function intensityCell(s: Symptom, e: Entry): string {
+  const parts: string[] = [];
+  if (s.inputs.slider.enabled) parts.push(e.sliderValue === null ? 'unspez' : String(e.sliderValue));
+  const sel = selectLabelFor(s, e);
+  if (sel) parts.push(sel);
+  return parts.join(' / ');
 }
 function numberCell(s: Symptom, v: number | null): string {
   if (!s.inputs.number.enabled || v === null) return '';
@@ -43,7 +48,7 @@ export function entriesToPdfBody(
         date: g.date,
         cells: [
           s.name,
-          sliderCell(s, e.sliderValue),
+          intensityCell(s, e),
           numberCell(s, e.numberValue),
           e.comment ?? '',
           tagsCell(s, tags)

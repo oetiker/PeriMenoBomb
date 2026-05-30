@@ -12,7 +12,7 @@ describe('openDialog store', () => {
     const s: OpenDialogState = {
       kind: 'entry-editor',
       route: '/day/2026-05-28',
-      payload: { date: '2026-05-28', symptomId: 'x', sliderValue: null, numberValue: null, comment: '' }
+      payload: { date: '2026-05-28', symptomId: 'x', sliderValue: null, numberValue: null, comment: '', selectKey: null }
     };
     await persistDialog(s);
     const row = await db.meta.get('openDialog');
@@ -23,7 +23,7 @@ describe('openDialog store', () => {
     const s: OpenDialogState = {
       kind: 'entry-editor',
       route: '/day/2026-05-28',
-      payload: { date: '2026-05-28', symptomId: 'x', sliderValue: null, numberValue: null, comment: '' }
+      payload: { date: '2026-05-28', symptomId: 'x', sliderValue: null, numberValue: null, comment: '', selectKey: null }
     };
     await persistDialog(s);
     await updateDialogPayload({ comment: 'hello' });
@@ -35,7 +35,7 @@ describe('openDialog store', () => {
   it('clearDialog removes the row', async () => {
     await persistDialog({
       kind: 'entry-editor', route: '/day/2026-05-28',
-      payload: { date: '2026-05-28', symptomId: 'x', sliderValue: null, numberValue: null, comment: '' }
+      payload: { date: '2026-05-28', symptomId: 'x', sliderValue: null, numberValue: null, comment: '', selectKey: null }
     });
     await clearDialog();
     expect(await loadOpenDialog()).toBeNull();

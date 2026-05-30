@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyCell, valueNumberDomain, buildHeatmap, cellColor, OFFSET_MIN, OFFSET_MAX } from './heatmap';
+import { classifyCell, valueNumberDomain, selectValueDomain, valueDomain, selectEntryValue, buildHeatmap, cellColor, OFFSET_MIN, OFFSET_MAX } from './heatmap';
 import type { Entry, Symptom } from '$lib/db';
 
 const base = (over: Partial<Symptom['inputs']> = {}): Symptom['inputs'] => ({
@@ -54,6 +54,47 @@ describe('valueNumberDomain', () => {
   });
   it('returns null for non-number symptoms or no data', () => {
     expect(valueNumberDomain([], sym(base()))).toBeNull();
+  });
+});
+
+describe('select input', () => {
+  const selOpts = [
+    { key: 'k1', label: 'leicht', value: 1 },
+    { key: 'k2', label: 'stark', value: 5 },
+    { key: 'k3', label: 'nur Notiz', value: null },
+    { key: 'kd', label: 'alt', value: 3, deleted: true }
+  ];
+  const selSym = () => sym(base({ select: { enabled: true, required: false, options: selOpts } }));
+
+  it('selectEntryValue resolves the chosen option value, incl. deleted options', () => {
+    const s = selSym();
+    expect(selectEntryValue(s, ent('a', { selectKey: 'k2' }))).toBe(5);
+    expect(selectEntryValue(s, ent('a', { selectKey: 'kd' }))).toBe(3); // deleted still resolves
+    expect(selectEntryValue(s, ent('a', { selectKey: 'k3' }))).toBeNull(); // no value
+    expect(selectEntryValue(s, ent('a', { selectKey: null }))).toBeNull();
+    expect(selectEntryValue(s, ent('a', { selectKey: 'gone' }))).toBeNull();
+  });
+
+  it('selectValueDomain spans option values across entries', () => {
+    const s = selSym();
+    expect(selectValueDomain([ent('a', { selectKey: 'k1' }), ent('b', { selectKey: 'k2' })], s)).toEqual({ min: 1, max: 5 });
+    expect(selectValueDomain([ent('a', { selectKey: 'k3' })], s)).toBeNull(); // no numeric values
+  });
+
+  it('valueDomain dispatches to the select domain', () => {
+    const s = selSym();
+    expect(valueDomain([ent('a', { selectKey: 'k1' }), ent('b', { selectKey: 'k2' })], s)).toEqual({ min: 1, max: 5 });
+  });
+
+  it('classifyCell: no choice → unspez; value option → normalized; valueless option → recorded', () => {
+    const s = selSym();
+    const domain = { min: 1, max: 5 };
+    expect(classifyCell(s, ent('a', { selectKey: null }), domain)).toEqual({ kind: 'unspez', intensity: 0 });
+    const c = classifyCell(s, ent('a', { selectKey: 'k2' }), domain);
+    expect(c.kind).toBe('value');
+    expect(c.intensity).toBeCloseTo(1, 5);
+    expect(classifyCell(s, ent('a', { selectKey: 'k1' }), domain).intensity).toBeCloseTo(0, 5);
+    expect(classifyCell(s, ent('a', { selectKey: 'k3' }), domain)).toEqual({ kind: 'recorded', intensity: 1 });
   });
 });
 

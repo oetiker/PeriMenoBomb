@@ -5,7 +5,7 @@
   import { db, type Entry, type Symptom } from '$lib/db';
   import { getMeta, setMeta } from '$lib/db/meta';
   import { addDays, todayKey, daysBetweenKeys } from '$lib/utils/date';
-  import { classifyCell, valueNumberDomain, cellColor } from '$lib/report/heatmap';
+  import { classifyCell, valueDomain, cellColor } from '$lib/report/heatmap';
   import { zoomAt } from '$lib/report/heatmap-view';
 
   const CELL_W = 30;
@@ -61,7 +61,7 @@
     () => valueId
   );
   const entriesByDate = $derived(new Map(valueEntriesQ.current.map((e) => [e.date, e])));
-  const numberDomain = $derived(valueSym ? valueNumberDomain(valueEntriesQ.current, valueSym) : null);
+  const numberDomain = $derived(valueSym ? valueDomain(valueEntriesQ.current, valueSym) : null);
 
   const hasData = $derived(!!valueSym && N > 0);
 

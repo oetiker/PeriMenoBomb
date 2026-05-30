@@ -3,7 +3,7 @@ import { resetDatabase } from './index';
 import type { Symptom } from './index';
 import { defaultSymptomInputs } from './index';
 import { upsertEntry, getEntry, deleteEntry, listEntriesForDate, listEntriesForRange, hasEntry, listOccurrenceDates } from './entries';
-import { validateEntry } from './entries';
+import { validateEntry, selectLabelFor } from './entries';
 
 describe('entries', () => {
   beforeEach(() => resetDatabase());
@@ -143,5 +143,46 @@ describe('validateEntry', () => {
     inputs.slider.enabled = false; inputs.slider.required = true; // contradictory state
     const s = symptom({ inputs });
     expect(validateEntry(s, { sliderValue: null, numberValue: null, comment: '' }).ok).toBe(true);
+  });
+
+  it('reports select missing when required and no key chosen', () => {
+    const inputs = defaultSymptomInputs();
+    inputs.select!.enabled = true;
+    inputs.select!.required = true;
+    inputs.select!.options = [{ key: 'k1', label: 'A', value: null }];
+    const s = symptom({ inputs });
+    expect(validateEntry(s, { sliderValue: null, numberValue: null, comment: '', selectKey: null }))
+      .toEqual({ ok: false, missing: ['select'] });
+    expect(validateEntry(s, { sliderValue: null, numberValue: null, comment: '', selectKey: 'k1' }).ok).toBe(true);
+  });
+});
+
+describe('select entries', () => {
+  beforeEach(() => resetDatabase());
+
+  it('upsert stores and preserves selectKey', async () => {
+    const e = await upsertEntry({ date: '2026-05-27', symptomId: 's', selectKey: 'k2' });
+    expect(e.selectKey).toBe('k2');
+    // partial patch (comment only) keeps the prior key
+    const e2 = await upsertEntry({ date: '2026-05-27', symptomId: 's', comment: 'x' });
+    expect(e2.selectKey).toBe('k2');
+  });
+
+  it('selectLabelFor resolves labels, marks deleted, and handles unknown keys', () => {
+    const inputs = defaultSymptomInputs();
+    inputs.select!.enabled = true;
+    inputs.select!.options = [
+      { key: 'k1', label: 'leicht', value: 1 },
+      { key: 'kd', label: 'alt', value: 2, deleted: true }
+    ];
+    const s = symptom({ inputs });
+    expect(selectLabelFor(s, { selectKey: 'k1' })).toBe('leicht');
+    expect(selectLabelFor(s, { selectKey: 'kd' })).toBe('alt (gelöscht)');
+    expect(selectLabelFor(s, { selectKey: 'gone' })).toBe('(unbekannte Auswahl)');
+    expect(selectLabelFor(s, { selectKey: null })).toBe('');
+  });
+
+  it('selectLabelFor returns empty when select is disabled', () => {
+    expect(selectLabelFor(symptom(), { selectKey: 'k1' })).toBe('');
   });
 });

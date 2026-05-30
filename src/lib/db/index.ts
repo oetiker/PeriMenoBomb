@@ -36,17 +36,39 @@ export interface Tag {
   createdAt: number;
 }
 
+/** One choice in a symptom's select-input. */
+export interface SelectOption {
+  /** Stable identity, generated once via newId() and never changed. The chosen
+      key is what gets stored on the Entry, so renaming `label` later never
+      breaks the continuity of historical logs. */
+  key: string;
+  /** Free-text display label. Safe to edit at any time. */
+  label: string;
+  /** Optional numeric weight. When set, the chosen option's value feeds the
+      cycle-heatmap intensity (the same way a number/slider value does). */
+  value: number | null;
+  /** Soft-delete flag. A deleted option is hidden from the live dropdown but
+      kept in the config (so past entries still resolve their label and the
+      author can restore it). Absent/false means active. */
+  deleted?: boolean;
+}
+
 export interface SymptomInputs {
   slider:  { enabled: boolean; required: boolean; lowLabel: string; highLabel: string };
   number:  { enabled: boolean; required: boolean; unit: string; integer: boolean };
   comment: { enabled: boolean; required: boolean };
+  /** Single-choice dropdown with author-defined options. Optional in the type
+      because pre-v5 records are upgraded lazily; the v5 hook backfills it and
+      defaultSymptomInputs() always includes it for new symptoms. */
+  select?: { enabled: boolean; required: boolean; options: SelectOption[] };
 }
 
 export function defaultSymptomInputs(): SymptomInputs {
   return {
     slider:  { enabled: false, required: false, lowLabel: '', highLabel: '' },
     number:  { enabled: false, required: false, unit: '', integer: true },
-    comment: { enabled: false, required: false }
+    comment: { enabled: false, required: false },
+    select:  { enabled: false, required: false, options: [] }
   };
 }
 
@@ -57,6 +79,10 @@ export interface Entry {
   sliderValue: number | null;
   numberValue: number | null;
   comment:     string;
+  /** Chosen select-option key (see SymptomInputs.select). Optional because
+      pre-v5 entries and non-select entries have no choice; treat
+      null/undefined as "nothing selected". */
+  selectKey?:  string | null;
   updatedAt:   number;
 }
 
@@ -97,6 +123,12 @@ export class PeriMenoDB extends Dexie {
       entries:  'id, date, symptomId, [date+symptomId]',
       meta:     'key'
     }).upgrade(upgradeV3toV4);
+    this.version(5).stores({
+      symptoms: 'id, parentId, [parentId+sortIndex], archived',
+      tags:     'id, name',
+      entries:  'id, date, symptomId, [date+symptomId]',
+      meta:     'key'
+    }).upgrade(upgradeV4toV5);
   }
 }
 
@@ -125,6 +157,16 @@ export async function upgradeV3toV4(tx: Transaction): Promise<void> {
   // pre-v4 visual.
   await tx.table('symptoms').toCollection().modify((s: Partial<Symptom>) => {
     if (typeof s.bg !== 'boolean') s.bg = true;
+  });
+}
+
+export async function upgradeV4toV5(tx: Transaction): Promise<void> {
+  // Add the (disabled, empty) select-input config to existing symptoms so
+  // every record carries the full input shape.
+  await tx.table('symptoms').toCollection().modify((s: Partial<Symptom>) => {
+    if (s.inputs && !s.inputs.select) {
+      s.inputs.select = { enabled: false, required: false, options: [] };
+    }
   });
 }
 
