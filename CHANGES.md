@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] — v1.1 report views
 
 ### Added
+- **Configurable slider granularity** — a Settings dropdown (Intensitäts-Regler)
+  lets you snap the intensity slider to coarser steps (1/5/10/20/25). Stepped
+  modes show tick marks and only stop on those positions; the value is persisted
+  in `meta` and applies immediately. Default is `1` (stepless), so existing
+  behaviour is unchanged.
+
 - **Select input for symptoms** — a single-choice dropdown with author-defined
   options. Each option carries a stable uuid `key` (stored on the log, so
   renaming a label never breaks historical continuity) plus an optional numeric
@@ -32,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions deploy workflow, README, LICENSE and this changelog.
 
 ### Changed
+- **Faster startup** — the launch splash now covers only the hydration window
+  and is removed the instant the app is interactive. Dropped the forced 2 s
+  minimum and the pulse/explode/fade animations (~3.5 s perceived floor → real
+  load time).
+- **Report rows** — a slider entry now shows just the recorded number instead of
+  `low ··· value ··· high`.
 - **Route paths anglicised** — `/report/*` instead of `/verlauf/*` (UI labels
   stay German).
 - `BASE_PATH`-driven subpath support in `svelte.config.js` and the PWA manifest,

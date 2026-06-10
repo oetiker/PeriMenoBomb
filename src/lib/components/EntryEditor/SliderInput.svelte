@@ -4,8 +4,30 @@
     lowLabel: string;
     highLabel: string;
     onChange: (v: number | null) => void;
+    // Granularity of the continuous zone. 1 = stepless (every integer 1..100).
+    // Larger values snap the thumb to multiples of `step` within [step, 100].
+    step?: number;
   };
-  let { value, lowLabel, highLabel, onChange }: Props = $props();
+  let { value, lowLabel, highLabel, onChange, step = 1 }: Props = $props();
+
+  // Snap a raw 1..100 position to the configured granularity. step <= 1 keeps
+  // the historical free behaviour. Otherwise: nearest multiple of step, with
+  // the lowest stop at `step` and the highest at 100.
+  function snap(pos: number): number {
+    if (step <= 1) return pos;
+    const s = Math.round(pos / step) * step;
+    return Math.max(step, Math.min(100, s));
+  }
+
+  // Tick fractions (0..1 across the continuous track) for each reachable stop,
+  // so users see the slider only stops at these positions. Empty when stepless.
+  // Uses the same (v-1)/99 transform as the thumb.
+  const ticks = $derived.by<number[]>(() => {
+    if (step <= 1) return [];
+    const out: number[] = [];
+    for (let v = step; v <= 100; v += step) out.push((v - 1) / 99);
+    return out;
+  });
 
   // Track layout in track-relative coordinates (px).
   // We compute zones live from each rect to support container resizes.
@@ -26,12 +48,12 @@
     if (x < contStart) {
       // In the gap → hysteresis: keep current side.
       if (value === null) return { zone: 'unspez', pos: null };
-      return { zone: 'continuous', pos: 1 };
+      return { zone: 'continuous', pos: snap(1) };
     }
     const trackWidth = rect.width - contStart - RIGHT_INDENT_PX;
-    if (trackWidth <= 0) return { zone: 'continuous', pos: 1 };
+    if (trackWidth <= 0) return { zone: 'continuous', pos: snap(1) };
     const t = Math.max(0, Math.min(1, (x - contStart) / trackWidth));
-    const pos = Math.round(1 + t * 99); // 1..100
+    const pos = snap(Math.round(1 + t * 99)); // snapped to granularity, 1..100
     return { zone: 'continuous', pos };
   }
 
@@ -100,7 +122,9 @@
   >
     <div class="unspez-slot" aria-hidden="true"></div>
     <div class="gap" aria-hidden="true"></div>
-    <div class="cont-track" aria-hidden="true"></div>
+    <div class="cont-track" aria-hidden="true">
+      {#each ticks as t}<span class="tick" style="left: {t * 100}%"></span>{/each}
+    </div>
     <div class="thumb" style={thumbStyle()} data-thumb data-zone={zone}></div>
   </div>
   <div class="labels">
@@ -132,6 +156,11 @@
   .cont-track {
     position: absolute; left: 48px; right: 30px; top: 14px; height: 4px;
     background: var(--c-border); border-radius: 2px;
+  }
+  .tick {
+    position: absolute; top: -3px; width: 2px; height: 10px;
+    margin-left: -1px; border-radius: 1px;
+    background: var(--c-border-strong);
   }
   .thumb {
     position: absolute; top: 5.5px; width: 21px; height: 21px;

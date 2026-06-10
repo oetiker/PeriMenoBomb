@@ -7,6 +7,7 @@
   import SelectInput from './SelectInput.svelte';
   import SymptomEditModal from '$lib/components/SymptomAdmin/SymptomEditModal.svelte';
   import { upsertEntry, getEntry, deleteEntry, validateEntry } from '$lib/db/entries';
+  import { settings } from '$lib/stores/settings.svelte';
   import type { Symptom } from '$lib/db';
   import { isValidDateKey, formatLong } from '$lib/utils/date';
   import {
@@ -190,6 +191,7 @@
         value={sliderValue}
         lowLabel={symptom.inputs.slider.lowLabel}
         highLabel={symptom.inputs.slider.highLabel}
+        step={settings.sliderStep}
         onChange={(v) => (sliderValue = v)}
       />
     </section>

@@ -10,9 +10,7 @@
   const sliderText = $derived.by(() => {
     if (!symptom.inputs.slider.enabled) return '';
     if (entry.sliderValue === null) return 'unspez';
-    const low = symptom.inputs.slider.lowLabel || 'leicht';
-    const high = symptom.inputs.slider.highLabel || 'hoch';
-    return `${low} ··· ${entry.sliderValue} ··· ${high}`;
+    return String(entry.sliderValue);
   });
   const numberText = $derived.by(() => {
     if (!symptom.inputs.number.enabled || entry.numberValue === null) return '';

@@ -4,6 +4,7 @@
   import Snackbar from '$lib/components/ui/Snackbar.svelte';
   import { snackbar } from '$lib/stores/snackbar.svelte';
   import { loadOpenDialog, pendingRestore } from '$lib/stores/openDialog.svelte';
+  import { loadSettings } from '$lib/stores/settings.svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { onMount } from 'svelte';
@@ -12,11 +13,12 @@
   // Service-Worker-Update-Hinweis: bei neuem SW Toast „Update verfügbar" mit
   // Reload-Action zeigen. Spec § Offline & PWA.
   onMount(async () => {
-    // Guarantee at least 2s of pulsing before the bomb detonates, no matter
-    // how fast hydration finishes. performance.now() = ms since page-load.
-    const MIN_SPLASH_MS = 2000;
-    const remaining = Math.max(0, MIN_SPLASH_MS - performance.now());
-    setTimeout(() => document.body.classList.add('app-ready'), remaining);
+    // The splash covers exactly the hydration window: hide it as soon as the
+    // app is mounted and interactive. No artificial delay, no animation.
+    document.body.classList.add('app-ready');
+
+    // Restore persisted user settings (e.g. slider granularity).
+    await loadSettings();
 
     const { registerSW } = await import('virtual:pwa-register');
     const updateSW = registerSW({

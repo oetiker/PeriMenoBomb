@@ -28,8 +28,6 @@
         width: min(82vmin, 820px);
         height: min(82vmin, 820px);
         object-fit: contain;
-        animation: app-splash-pulse 3.6s ease-in-out infinite;
-        will-change: transform, opacity, filter;
       }
       #app-splash .title {
         font-size: clamp(1.75rem, 6vmin, 3rem);
@@ -44,47 +42,10 @@
         margin: 0;
         line-height: 1.2;
       }
-      @keyframes app-splash-pulse {
-        0%, 100% { opacity: 0.88; transform: scale(1);     filter: brightness(1); }
-        50%      { opacity: 1;    transform: scale(1.055); filter: brightness(1.08); }
-      }
-
-      /* Detonate: heavy, slow swell past the viewport while bleaching to white,
-         text fades out, container clears just after the flash. */
-      @keyframes app-splash-explode {
-        0%   { transform: scale(1);   opacity: 1;    filter: brightness(1); }
-        45%  { transform: scale(1.7); opacity: 1;    filter: brightness(1.9); }
-        75%  { transform: scale(3.2); opacity: 0.55; filter: brightness(2.8); }
-        100% { transform: scale(5);   opacity: 0;    filter: brightness(3.5); }
-      }
-      @keyframes app-splash-text-out {
-        to { opacity: 0; transform: translateY(8px); }
-      }
-      @keyframes app-splash-fade {
-        0%, 55% { opacity: 1; }
-        100%    { opacity: 0; }
-      }
+      /* No animation: the splash simply covers the hydration window and is
+         removed the instant the app is mounted (body.app-ready). */
       body.app-ready #app-splash {
-        pointer-events: none;
-        animation: app-splash-fade 1500ms ease-out forwards;
-      }
-      body.app-ready #app-splash img {
-        animation: app-splash-explode 1400ms cubic-bezier(0.18, 0.6, 0.3, 1) forwards;
-      }
-      body.app-ready #app-splash .title,
-      body.app-ready #app-splash .tagline {
-        animation: app-splash-text-out 500ms ease-out forwards;
-      }
-      @media (prefers-reduced-motion: reduce) {
-        #app-splash img { animation: none; }
-        body.app-ready #app-splash,
-        body.app-ready #app-splash img,
-        body.app-ready #app-splash .title,
-        body.app-ready #app-splash .tagline {
-          animation: none;
-          opacity: 0;
-          transition: opacity 350ms ease-out;
-        }
+        display: none;
       }
     </style>
     %sveltekit.head%
