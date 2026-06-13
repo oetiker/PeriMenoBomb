@@ -5,6 +5,9 @@
   import { snackbar } from '$lib/stores/snackbar.svelte';
   import { loadOpenDialog, pendingRestore } from '$lib/stores/openDialog.svelte';
   import { loadSettings } from '$lib/stores/settings.svelte';
+  // Imported for its side effect: registers the beforeinstallprompt/appinstalled
+  // listeners at app start so the PWA install offer is never missed.
+  import '$lib/stores/pwaInstall.svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { onMount } from 'svelte';

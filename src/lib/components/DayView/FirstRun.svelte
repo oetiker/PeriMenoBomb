@@ -5,6 +5,8 @@
   import { snackbar } from '$lib/stores/snackbar.svelte';
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
+  import InstallButton from '$lib/components/ui/InstallButton.svelte';
+  import { pwaInstall } from '$lib/stores/pwaInstall.svelte';
 
   async function useTemplate() {
     try {
@@ -27,9 +29,17 @@
   <p>Wie magst du starten?</p>
   <button type="button" class="primary" onclick={useTemplate}>Mit Standard-Vorlage starten</button>
   <button type="button" class="secondary" onclick={buildOwn}>Eigene Liste aufbauen</button>
-  <p class="hint">
-    <strong>Wichtig (iOS):</strong> Bitte füge diese App zum Home-Bildschirm hinzu — sonst löscht Safari deine Daten nach ~7 Tagen.
-  </p>
+
+  {#if pwaInstall.canInstall}
+    <div class="install-wrap">
+      <p class="install-hint">Tipp: Installiere die App, damit deine Daten dauerhaft erhalten bleiben.</p>
+      <InstallButton />
+    </div>
+  {:else if !pwaInstall.isInstalled}
+    <p class="hint">
+      <strong>Wichtig (iOS):</strong> Bitte füge diese App zum Home-Bildschirm hinzu — sonst löscht Safari deine Daten nach ~7 Tagen.
+    </p>
+  {/if}
 </section>
 
 <style>
@@ -39,4 +49,6 @@
   .primary { background: var(--c-primary); color: var(--c-primary-contrast); }
   .secondary { background: var(--c-surface-2); color: var(--c-text); border: 1px solid var(--c-border); }
   .hint { margin-top: var(--sp-4); padding: var(--sp-3); background: #fff8e1; border-radius: var(--r-2); font-size: var(--fs-sm); color: var(--c-text); }
+  .install-wrap { margin-top: var(--sp-4); }
+  .install-hint { font-size: var(--fs-sm); color: var(--c-text-dim); margin-bottom: var(--sp-2); }
 </style>

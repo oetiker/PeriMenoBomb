@@ -4,7 +4,7 @@
   import EntryEditor from '$lib/components/EntryEditor/EntryEditor.svelte';
   import { liveQueryEffect } from '$lib/stores/liveQuery.svelte';
   import { db, type Symptom, type Entry } from '$lib/db';
-  import { deleteEntry, upsertEntry, listEntriesForDate } from '$lib/db/entries';
+  import { deleteEntry, upsertEntry, listEntriesForDate, streakEndingOn } from '$lib/db/entries';
   import { listDailySymptomsForDate } from '$lib/db/symptoms';
   import { snackbar } from '$lib/stores/snackbar.svelte';
   import { todayKey } from '$lib/utils/date';
@@ -16,6 +16,49 @@
   const symptomsQ = liveQueryEffect(() => db.symptoms.toArray(), [] as Symptom[]);
   const dailyQ = liveQueryEffect(() => listDailySymptomsForDate(date), [] as Symptom[], () => date);
   const symptomMap = $derived(new Map(symptomsQ.current.map((s) => [s.id, s])));
+
+  // Flat position of each symptom in the symptom-list display order: a
+  // depth-first walk of the tree, siblings by sortIndex. Used to sort the day's
+  // entries so they read in the same order as the symptom list (just flattened).
+  const orderIndex = $derived.by(() => {
+    const byParent = new Map<string | null, Symptom[]>();
+    for (const s of symptomsQ.current) {
+      const list = byParent.get(s.parentId) ?? [];
+      list.push(s);
+      byParent.set(s.parentId, list);
+    }
+    for (const list of byParent.values()) list.sort((a, b) => a.sortIndex - b.sortIndex);
+    const index = new Map<string, number>();
+    let i = 0;
+    const walk = (parent: string | null) => {
+      for (const s of byParent.get(parent) ?? []) {
+        index.set(s.id, i++);
+        walk(s.id);
+      }
+    };
+    walk(null);
+    return index;
+  });
+
+  const sortedEntries = $derived(
+    [...entriesQ.current].sort(
+      (a, b) => (orderIndex.get(a.symptomId) ?? Infinity) - (orderIndex.get(b.symptomId) ?? Infinity)
+    )
+  );
+
+  // Consecutive-day run ending on the viewed date, per logged symptom. Stays
+  // live because streakEndingOn reads the entries table inside the liveQuery.
+  const streaksQ = liveQueryEffect(
+    async () => {
+      const map: Record<string, number> = {};
+      for (const e of entriesQ.current) {
+        map[e.symptomId] = await streakEndingOn(e.symptomId, date);
+      }
+      return map;
+    },
+    {} as Record<string, number>,
+    () => [date, entriesQ.current]
+  );
 
   let editing = $state<{ entry: Entry | null; symptom: Symptom; date: string } | null>(null);
 
@@ -63,10 +106,10 @@
     <p class="empty">Tippe das + unten, um Symptome zu erfassen.</p>
   {/if}
 
-  {#each entriesQ.current as e (e.id)}
+  {#each sortedEntries as e (e.id)}
     {@const s = symptomMap.get(e.symptomId)}
     {#if s}
-      <EntryCard entry={e} symptom={s} onTap={() => openForEntry(e, s)} onSwipe={() => removeWithUndo(e, s)} />
+      <EntryCard entry={e} symptom={s} streak={streaksQ.current[e.symptomId] ?? 1} onTap={() => openForEntry(e, s)} onSwipe={() => removeWithUndo(e, s)} />
     {/if}
   {/each}
 </section>

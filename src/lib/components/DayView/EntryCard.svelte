@@ -1,19 +1,17 @@
 <script lang="ts">
   import Badge from '$lib/components/ui/Badge.svelte';
   import SwipeRow from '$lib/components/ui/SwipeRow.svelte';
-  import { MessageCircle } from '@lucide/svelte';
+  import { MessageCircle, Flame } from '@lucide/svelte';
   import { selectLabelFor } from '$lib/db/entries';
   import type { Symptom, Entry } from '$lib/db';
 
-  type Props = { entry: Entry; symptom: Symptom; onTap: () => void; onSwipe: () => void };
-  let { entry, symptom, onTap, onSwipe }: Props = $props();
+  type Props = { entry: Entry; symptom: Symptom; streak?: number; onTap: () => void; onSwipe: () => void };
+  let { entry, symptom, streak = 1, onTap, onSwipe }: Props = $props();
 
   const sliderText = $derived.by(() => {
     if (!symptom.inputs.slider.enabled) return '';
     if (entry.sliderValue === null) return 'unspezifisch';
-    const low = symptom.inputs.slider.lowLabel || 'leicht';
-    const high = symptom.inputs.slider.highLabel || 'hoch';
-    return `${low} ··· ${entry.sliderValue} ··· ${high}`;
+    return String(entry.sliderValue);
   });
 
   const numberText = $derived.by(() => {
@@ -38,6 +36,9 @@
         {#if selectText}<span class="select">{selectText}</span>{/if}
         {#if showComment}<MessageCircle size={14} />{/if}
         {#if !sliderText && !numberText && !selectText && !showComment}<span class="empty">erfasst</span>{/if}
+        {#if streak >= 2}
+          <span class="streak" title="{streak} Tage in Folge erfasst"><Flame size={13} />{streak}</span>
+        {/if}
       </div>
     </div>
   </button>
@@ -57,4 +58,10 @@
   .name { font-weight: var(--fw-bold); }
   .meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--c-text-dim); margin-top: 2px; }
   .empty { font-style: italic; }
+  .streak {
+    display: inline-flex; align-items: center; gap: 3px;
+    color: var(--c-accent, #f97316);
+    font-weight: var(--fw-medium);
+    font-variant-numeric: tabular-nums;
+  }
 </style>

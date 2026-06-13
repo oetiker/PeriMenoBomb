@@ -1,5 +1,7 @@
 <script lang="ts">
   import DateHeader from '$lib/components/DayView/DateHeader.svelte';
+  import StatusBar from '$lib/components/DayView/StatusBar.svelte';
+  import StatusBarConfig from '$lib/components/DayView/StatusBarConfig.svelte';
   import EntryList from '$lib/components/DayView/EntryList.svelte';
   import SymptomSheet from '$lib/components/SymptomSheet/SymptomSheet.svelte';
   import EntryEditor from '$lib/components/EntryEditor/EntryEditor.svelte';
@@ -10,6 +12,7 @@
   import { db, type Symptom, type Entry } from '$lib/db';
   import { listEntriesForDate } from '$lib/db/entries';
   import { getOrDefault } from '$lib/db/meta';
+  import { loadStatusItems, saveStatusItems, type StatusItem } from '$lib/db/statusBar';
   import { pendingRestore } from '$lib/stores/openDialog.svelte';
 
   let { data } = $props();
@@ -33,6 +36,16 @@
   const symptomsQ = liveQueryEffect(() => db.symptoms.toArray(), [] as Symptom[]);
 
   const enteredIds = $derived(new Set(entriesQ.current.map((e) => e.symptomId)));
+
+  // Status bar: configured items live in `meta`; the picker only offers leaf,
+  // non-archived symptoms (folders can't be logged).
+  const statusItemsQ = liveQueryEffect(() => loadStatusItems(), [] as StatusItem[]);
+  const selectableSymptoms = $derived(symptomsQ.current.filter((s) => !s.isFolder && !s.archived));
+  let statusConfigOpen = $state(false);
+
+  async function onSaveStatus(items: StatusItem[]) {
+    await saveStatusItems(items);
+  }
 
   function onPick(symptomId: string) {
     const sym = symptomsQ.current.find((s) => s.id === symptomId);
@@ -63,7 +76,21 @@
   <FirstRun />
 {:else}
   <DateHeader />
+  <StatusBar
+    date={currentDate.value}
+    items={statusItemsQ.current}
+    symptoms={selectableSymptoms}
+    onConfigure={() => (statusConfigOpen = true)}
+  />
   <EntryList date={currentDate.value} />
+
+  <StatusBarConfig
+    open={statusConfigOpen}
+    items={statusItemsQ.current}
+    symptoms={selectableSymptoms}
+    onSave={onSaveStatus}
+    onClose={() => (statusConfigOpen = false)}
+  />
 
   <Fab onClick={() => sheetOpen = true} />
 

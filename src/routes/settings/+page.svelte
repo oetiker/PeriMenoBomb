@@ -11,15 +11,8 @@
   import { snackbar } from '$lib/stores/snackbar.svelte';
   import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
-
-  let isStandalone = $state(false);
-  $effect(() => {
-    if (typeof window !== 'undefined') {
-      isStandalone =
-        window.matchMedia('(display-mode: standalone)').matches ||
-        (window.navigator as any).standalone === true;
-    }
-  });
+  import InstallButton from '$lib/components/ui/InstallButton.svelte';
+  import { pwaInstall } from '$lib/stores/pwaInstall.svelte';
 
   let importState = $state<{ payload: ExportPayload } | null>(null);
   let templateConfirm = $state<{ existing: number } | null>(null);
@@ -109,7 +102,18 @@
 
 <header class="hd"><h1>Einstellungen</h1></header>
 
-{#if !isStandalone}
+{#if pwaInstall.isInstalled}
+  <section>
+    <h2>App</h2>
+    <InstallButton />
+  </section>
+{:else if pwaInstall.canInstall}
+  <section>
+    <h2>App installieren</h2>
+    <p>Installiere PeriMenoBomb für schnellen Zugriff — und damit deine Daten dauerhaft erhalten bleiben.</p>
+    <InstallButton />
+  </section>
+{:else}
   <section class="warn">
     <h2>iOS / Safari Hinweis</h2>
     <p>
