@@ -2,8 +2,9 @@
   import { untrack } from 'svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
   import Badge from '$lib/components/ui/Badge.svelte';
+  import SwipeRow from '$lib/components/ui/SwipeRow.svelte';
   import SymptomSheet from '$lib/components/SymptomSheet/SymptomSheet.svelte';
-  import { GripVertical, Trash2, Plus } from '@lucide/svelte';
+  import { GripVertical, Plus } from '@lucide/svelte';
   import { newId } from '$lib/utils/uuid';
   import type { StatusItem } from '$lib/db/statusBar';
   import type { Symptom } from '$lib/db';
@@ -55,36 +56,48 @@
     commit();
   }
 
-  // ─── flat drag-to-reorder ───────────────────────────────────
+  // ─── drag-to-reorder (lift + dashed placeholder, like the symptoms tab) ──
   const rowRefs = new Map<string, HTMLElement>();
   function trackRow(node: HTMLElement, id: string) {
     rowRefs.set(id, node);
     return { destroy() { rowRefs.delete(id); } };
   }
-  let dragId = $state<string | null>(null);
+  let listEl = $state<HTMLElement | null>(null);
+
+  type DragState = { id: string; rowHeight: number; grabOffsetY: number; currentY: number };
+  let dragState = $state<DragState | null>(null);
   let activePointerId: number | null = null;
 
   function startDrag(e: PointerEvent, id: string) {
     e.preventDefault();
-    dragId = id;
+    e.stopPropagation(); // don't let the SwipeRow treat the grab as a swipe
+    const li = rowRefs.get(id);
+    if (!li) return;
+    const rect = li.getBoundingClientRect();
+    dragState = { id, rowHeight: rect.height, grabOffsetY: e.clientY - rect.top, currentY: e.clientY };
     activePointerId = e.pointerId;
     window.addEventListener('pointermove', onDragMove, { passive: false });
     window.addEventListener('pointerup', onDragEnd);
     window.addEventListener('pointercancel', onDragEnd);
   }
   function onDragMove(e: PointerEvent) {
-    if (dragId === null || e.pointerId !== activePointerId) return;
+    if (!dragState || e.pointerId !== activePointerId) return;
     e.preventDefault();
+    dragState.currentY = e.clientY;
+    // Insertion index among the non-dragged rows: count those whose midpoint
+    // sits above the pointer. Their layout boxes are untransformed, so their
+    // rects are stable as the list reflows around the lifted row.
     const y = e.clientY;
-    // Insertion index = count of rows whose vertical midpoint sits above y.
-    let target = local.length;
-    for (let i = 0; i < local.length; i++) {
-      const el = rowRefs.get(local[i].id);
-      if (!el) continue;
-      const rect = el.getBoundingClientRect();
-      if (y < rect.top + rect.height / 2) { target = i; break; }
+    let idx = 0;
+    for (const it of local) {
+      if (it.id === dragState.id) continue;
+      const el = rowRefs.get(it.id);
+      if (!el) { idx++; continue; }
+      const r = el.getBoundingClientRect();
+      if (y < r.top + r.height / 2) break;
+      idx++;
     }
-    reorder(dragId, target);
+    reorderTo(dragState.id, idx);
   }
   function onDragEnd(e: PointerEvent) {
     if (e.pointerId !== activePointerId) return;
@@ -92,23 +105,36 @@
     window.removeEventListener('pointerup', onDragEnd);
     window.removeEventListener('pointercancel', onDragEnd);
     activePointerId = null;
-    if (dragId !== null) { dragId = null; commit(); }
+    if (dragState) { dragState = null; commit(); }
   }
-  function reorder(id: string, toIndex: number) {
-    const from = local.findIndex((it) => it.id === id);
-    if (from === -1) return;
-    if (toIndex === from || toIndex === from + 1) return; // already there
-    const arr = [...local];
-    const [item] = arr.splice(from, 1);
-    arr.splice(toIndex > from ? toIndex - 1 : toIndex, 0, item);
-    local = arr;
+  function reorderTo(id: string, insertIdx: number) {
+    const cur = local.findIndex((it) => it.id === id);
+    if (cur === -1) return;
+    const without = local.filter((it) => it.id !== id);
+    const clamped = Math.max(0, Math.min(insertIdx, without.length));
+    const next = [...without.slice(0, clamped), local[cur], ...without.slice(clamped)];
+    if (next.some((it, i) => it.id !== local[i].id)) local = next;
+  }
+
+  function dragTransform(id: string): string {
+    const ds = dragState;
+    if (!ds || ds.id !== id || !listEl) return '';
+    const idx = local.findIndex((it) => it.id === id);
+    if (idx < 0) return '';
+    const listTop = listEl.getBoundingClientRect().top;
+    const naturalTop = listTop + idx * ds.rowHeight;
+    const wantedTop = ds.currentY - ds.grabOffsetY;
+    return `translateY(${wantedTop - naturalTop}px)`;
+  }
+  function draggedIndex(): number {
+    return dragState ? local.findIndex((it) => it.id === dragState!.id) : -1;
   }
 </script>
 
 <Modal open={open && !picking} {onClose} title="Statusleiste">
   <p class="hint">
     Zeigt pro Symptom, wie viele Tage seit der letzten Erfassung vergangen sind —
-    bezogen auf den angezeigten Tag.
+    bezogen auf den angezeigten Tag. Nach links wischen zum Entfernen.
   </p>
 
   <button type="button" class="add" onclick={() => (picking = true)}>
@@ -118,29 +144,43 @@
   {#if local.length === 0}
     <p class="empty">Noch keine Symptome. Tippe „Symptom hinzufügen".</p>
   {:else}
-    <ul class="items">
+    <ul class="items" bind:this={listEl}>
       {#each local as item (item.id)}
         {@const sym = symptomFor(item.symptomId)}
-        <li class="item" class:dragging={dragId === item.id} use:trackRow={item.id}>
-          <button
-            type="button"
-            class="handle"
-            aria-label="Verschieben"
-            onpointerdown={(e) => startDrag(e, item.id)}
-          >
-            <GripVertical size={18} />
-          </button>
-          {#if sym}
-            <Badge icon={sym.icon} color={sym.color} duotone={sym.duotone ?? true} bg={sym.bg ?? true} size={28} />
-            <span class="name">{sym.name}</span>
-          {:else}
-            <span class="name missing">Unbekanntes Symptom</span>
-          {/if}
-          <button type="button" class="trash" aria-label="Entfernen" onclick={() => remove(item.id)}>
-            <Trash2 size={18} />
-          </button>
+        <li
+          class="item"
+          class:dragging={dragState?.id === item.id}
+          use:trackRow={item.id}
+          style:transform={dragTransform(item.id)}
+        >
+          <SwipeRow onSwipe={() => remove(item.id)}>
+            <div class="row-inner">
+              {#if sym}
+                <Badge icon={sym.icon} color={sym.color} duotone={sym.duotone ?? true} bg={sym.bg ?? true} size={28} />
+                <span class="name">{sym.name}</span>
+              {:else}
+                <span class="name missing">Unbekanntes Symptom</span>
+              {/if}
+              <button
+                type="button"
+                class="handle"
+                aria-label="Verschieben"
+                onpointerdown={(e) => startDrag(e, item.id)}
+              >
+                <GripVertical size={18} />
+              </button>
+            </div>
+          </SwipeRow>
         </li>
       {/each}
+      {#if dragState}
+        <li
+          class="drop-placeholder"
+          aria-hidden="true"
+          style:top="{draggedIndex() * dragState.rowHeight}px"
+          style:height="{dragState.rowHeight}px"
+        ></li>
+      {/if}
     </ul>
   {/if}
 </Modal>
@@ -163,26 +203,41 @@
     margin-bottom: var(--sp-4);
   }
   .empty { font-size: var(--fs-sm); color: var(--c-text-dim); text-align: center; padding: var(--sp-4); }
-  .items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+  .items {
+    list-style: none; margin: 0; padding: 0;
+    position: relative;
+    border-top: 1px solid var(--c-border);
+  }
   .item {
+    position: relative;
+    background: var(--c-surface);
+    will-change: transform;
+  }
+  .item .row-inner { border-bottom: 1px solid var(--c-border); }
+  .item.dragging { z-index: 10; box-shadow: var(--shadow-2); }
+  .row-inner {
     display: flex; align-items: center; gap: var(--sp-2);
     padding: var(--sp-2);
-    border: 1px solid var(--c-border);
-    border-radius: var(--r-2);
     background: var(--c-surface);
   }
-  .item.dragging { opacity: 0.6; border-color: var(--c-text-dim); }
+  .name { flex: 1; min-width: 0; font-size: var(--fs-md); }
+  .name.missing { color: var(--c-text-dim); font-style: italic; }
   .handle {
     border: 0; background: none; color: var(--c-text-dim);
     cursor: grab; padding: var(--sp-1); display: flex; align-items: center;
+    flex-shrink: 0;
     touch-action: none;
   }
   .handle:active { cursor: grabbing; }
-  .name { flex: 1; min-width: 0; font-size: var(--fs-md); }
-  .name.missing { color: var(--c-text-dim); font-style: italic; }
-  .trash {
-    border: 0; background: none; color: var(--c-text-dim);
-    cursor: pointer; padding: var(--sp-1); display: flex; align-items: center; flex-shrink: 0;
+  .drop-placeholder {
+    position: absolute;
+    left: var(--sp-2);
+    right: var(--sp-2);
+    box-sizing: border-box;
+    border: 1px dashed var(--c-accent, var(--c-text-dim));
+    border-radius: var(--r-2);
+    background: color-mix(in srgb, var(--c-accent, var(--c-text-dim)) 10%, transparent);
+    pointer-events: none;
+    z-index: 1;
   }
-  .trash:hover { color: var(--c-danger, #ef4444); }
 </style>

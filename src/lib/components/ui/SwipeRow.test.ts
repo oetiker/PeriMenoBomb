@@ -5,18 +5,16 @@ import SwipeRow from './SwipeRow.svelte';
 
 const snip = (html: string) => createRawSnippet(() => ({ render: () => `<span>${html}</span>` }));
 
-function touch(x: number, y = 0): Touch {
-  return { clientX: x, clientY: y, identifier: 1, pageX: x, pageY: y, screenX: x, screenY: y, target: document.body, force: 1, radiusX: 1, radiusY: 1, rotationAngle: 0 } as unknown as Touch;
-}
+const ptr = (clientX: number, clientY = 0) => ({ clientX, clientY, pointerId: 1, pointerType: 'touch', button: 0 });
 
 describe('SwipeRow', () => {
   it('fires onSwipe when swipe left exceeds threshold', async () => {
     let swiped = 0;
     const { container } = render(SwipeRow, { props: { onSwipe: () => { swiped++; }, children: snip('row') } as any });
     const el = container.querySelector('.swipe-row') as HTMLElement;
-    await fireEvent.touchStart(el, { touches: [touch(200)] });
-    await fireEvent.touchMove(el, { touches: [touch(50)] });
-    await fireEvent.touchEnd(el, { changedTouches: [touch(50)] });
+    await fireEvent.pointerDown(el, ptr(200));
+    await fireEvent.pointerMove(el, ptr(50));
+    await fireEvent.pointerUp(el, ptr(50));
     expect(swiped).toBe(1);
   });
 
@@ -24,9 +22,19 @@ describe('SwipeRow', () => {
     let swiped = 0;
     const { container } = render(SwipeRow, { props: { onSwipe: () => { swiped++; }, children: snip('row') } as any });
     const el = container.querySelector('.swipe-row') as HTMLElement;
-    await fireEvent.touchStart(el, { touches: [touch(200)] });
-    await fireEvent.touchMove(el, { touches: [touch(180)] });
-    await fireEvent.touchEnd(el, { changedTouches: [touch(180)] });
+    await fireEvent.pointerDown(el, ptr(200));
+    await fireEvent.pointerMove(el, ptr(180));
+    await fireEvent.pointerUp(el, ptr(180));
+    expect(swiped).toBe(0);
+  });
+
+  it('does not fire for a vertical drag (lets the page scroll)', async () => {
+    let swiped = 0;
+    const { container } = render(SwipeRow, { props: { onSwipe: () => { swiped++; }, children: snip('row') } as any });
+    const el = container.querySelector('.swipe-row') as HTMLElement;
+    await fireEvent.pointerDown(el, ptr(200, 100));
+    await fireEvent.pointerMove(el, ptr(190, 300)); // mostly vertical
+    await fireEvent.pointerUp(el, ptr(190, 300));
     expect(swiped).toBe(0);
   });
 });
