@@ -2,7 +2,8 @@
   import { untrack } from 'svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
   import Badge from '$lib/components/ui/Badge.svelte';
-  import { ChevronUp, ChevronDown, Trash2, Plus } from '@lucide/svelte';
+  import SymptomSheet from '$lib/components/SymptomSheet/SymptomSheet.svelte';
+  import { GripVertical, Trash2, Plus } from '@lucide/svelte';
   import { newId } from '$lib/utils/uuid';
   import type { StatusItem } from '$lib/db/statusBar';
   import type { Symptom } from '$lib/db';
@@ -10,129 +11,178 @@
   type Props = {
     open: boolean;
     items: StatusItem[];
-    /** Selectable symptoms — leaf, non-archived. Folders/archived are excluded
-        upstream so the picker only offers things that can actually be logged. */
+    /** All non-archived symptoms (incl. folders) — the picker drills the tree
+        like the logging sheet; only leaves can be added. */
     symptoms: Symptom[];
+    /** Persisted immediately on every add/remove/reorder. */
     onSave: (items: StatusItem[]) => void;
     onClose: () => void;
   };
   let { open, items, symptoms, onSave, onClose }: Props = $props();
 
-  // Working copy; committed only on Speichern (same pattern as the icon picker).
-  let local = $state<StatusItem[]>(untrack(() => $state.snapshot(items)));
+  // Working copy, source of truth for the list while open. Re-synced from the
+  // prop only when the dialog (re)opens — our own saves echo back through the
+  // liveQuery, and resyncing then would fight an in-progress drag.
+  let local = $state<StatusItem[]>(untrack(() => $state.snapshot(items) as StatusItem[]));
   $effect(() => {
     if (!open) return;
-    untrack(() => { local = $state.snapshot(items); });
+    untrack(() => { local = $state.snapshot(items) as StatusItem[]; });
   });
+
+  // While picking, the config Modal yields to the symptom tree (the Sheet sits
+  // below the Modal in z-order, so they can't both be visible).
+  let picking = $state(false);
+  $effect(() => { if (!open) picking = false; });
 
   function symptomFor(id: string): Symptom | undefined {
     return symptoms.find((s) => s.id === id);
   }
+  const configuredIds = $derived(new Set(local.map((it) => it.symptomId)));
 
-  function add() {
-    const first = symptoms[0];
-    if (!first) return;
-    local = [...local, { id: newId(), type: 'daysSince', symptomId: first.id }];
+  function commit() {
+    onSave($state.snapshot(local) as StatusItem[]);
+  }
+
+  function onPick(symptomId: string) {
+    if (!configuredIds.has(symptomId)) {
+      local = [...local, { id: newId(), type: 'daysSince', symptomId }];
+      commit();
+    }
+    picking = false;
   }
   function remove(id: string) {
     local = local.filter((it) => it.id !== id);
-  }
-  function move(i: number, delta: number) {
-    const j = i + delta;
-    if (j < 0 || j >= local.length) return;
-    const next = [...local];
-    [next[i], next[j]] = [next[j], next[i]];
-    local = next;
-  }
-  function setSymptom(id: string, symptomId: string) {
-    local = local.map((it) => (it.id === id ? { ...it, symptomId } : it));
+    commit();
   }
 
-  function save() {
-    // Snapshot to strip the Svelte state proxy — dexie (IndexedDB structured
-    // clone) can't serialise a proxy.
-    onSave($state.snapshot(local) as StatusItem[]);
-    onClose();
+  // ─── flat drag-to-reorder ───────────────────────────────────
+  const rowRefs = new Map<string, HTMLElement>();
+  function trackRow(node: HTMLElement, id: string) {
+    rowRefs.set(id, node);
+    return { destroy() { rowRefs.delete(id); } };
+  }
+  let dragId = $state<string | null>(null);
+  let activePointerId: number | null = null;
+
+  function startDrag(e: PointerEvent, id: string) {
+    e.preventDefault();
+    dragId = id;
+    activePointerId = e.pointerId;
+    window.addEventListener('pointermove', onDragMove, { passive: false });
+    window.addEventListener('pointerup', onDragEnd);
+    window.addEventListener('pointercancel', onDragEnd);
+  }
+  function onDragMove(e: PointerEvent) {
+    if (dragId === null || e.pointerId !== activePointerId) return;
+    e.preventDefault();
+    const y = e.clientY;
+    // Insertion index = count of rows whose vertical midpoint sits above y.
+    let target = local.length;
+    for (let i = 0; i < local.length; i++) {
+      const el = rowRefs.get(local[i].id);
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      if (y < rect.top + rect.height / 2) { target = i; break; }
+    }
+    reorder(dragId, target);
+  }
+  function onDragEnd(e: PointerEvent) {
+    if (e.pointerId !== activePointerId) return;
+    window.removeEventListener('pointermove', onDragMove);
+    window.removeEventListener('pointerup', onDragEnd);
+    window.removeEventListener('pointercancel', onDragEnd);
+    activePointerId = null;
+    if (dragId !== null) { dragId = null; commit(); }
+  }
+  function reorder(id: string, toIndex: number) {
+    const from = local.findIndex((it) => it.id === id);
+    if (from === -1) return;
+    if (toIndex === from || toIndex === from + 1) return; // already there
+    const arr = [...local];
+    const [item] = arr.splice(from, 1);
+    arr.splice(toIndex > from ? toIndex - 1 : toIndex, 0, item);
+    local = arr;
   }
 </script>
 
-<Modal {open} {onClose} title="Statusleiste einrichten">
-  {#if symptoms.length === 0}
-    <p class="hint">Keine Symptome vorhanden. Lege zuerst ein Symptom an.</p>
-  {:else}
-    <p class="hint">
-      Zeigt pro Eintrag, wie viele Tage seit der letzten Erfassung des gewählten
-      Symptoms vergangen sind — bezogen auf den angezeigten Tag.
-    </p>
+<Modal open={open && !picking} {onClose} title="Statusleiste">
+  <p class="hint">
+    Zeigt pro Symptom, wie viele Tage seit der letzten Erfassung vergangen sind —
+    bezogen auf den angezeigten Tag.
+  </p>
 
+  <button type="button" class="add" onclick={() => (picking = true)}>
+    <Plus size={18} /> Symptom hinzufügen
+  </button>
+
+  {#if local.length === 0}
+    <p class="empty">Noch keine Symptome. Tippe „Symptom hinzufügen".</p>
+  {:else}
     <ul class="items">
-      {#each local as item, i (item.id)}
+      {#each local as item (item.id)}
         {@const sym = symptomFor(item.symptomId)}
-        <li class="item">
+        <li class="item" class:dragging={dragId === item.id} use:trackRow={item.id}>
+          <button
+            type="button"
+            class="handle"
+            aria-label="Verschieben"
+            onpointerdown={(e) => startDrag(e, item.id)}
+          >
+            <GripVertical size={18} />
+          </button>
           {#if sym}
             <Badge icon={sym.icon} color={sym.color} duotone={sym.duotone ?? true} bg={sym.bg ?? true} size={28} />
+            <span class="name">{sym.name}</span>
+          {:else}
+            <span class="name missing">Unbekanntes Symptom</span>
           {/if}
-          <select
-            class="sym-select"
-            value={item.symptomId}
-            onchange={(e) => setSymptom(item.id, (e.currentTarget as HTMLSelectElement).value)}
-          >
-            {#each symptoms as s}
-              <option value={s.id}>{s.name}</option>
-            {/each}
-          </select>
-          <div class="row-actions">
-            <button type="button" class="icon-action" aria-label="Nach oben" disabled={i === 0} onclick={() => move(i, -1)}>
-              <ChevronUp size={18} />
-            </button>
-            <button type="button" class="icon-action" aria-label="Nach unten" disabled={i === local.length - 1} onclick={() => move(i, 1)}>
-              <ChevronDown size={18} />
-            </button>
-            <button type="button" class="icon-action danger" aria-label="Entfernen" onclick={() => remove(item.id)}>
-              <Trash2 size={18} />
-            </button>
-          </div>
+          <button type="button" class="trash" aria-label="Entfernen" onclick={() => remove(item.id)}>
+            <Trash2 size={18} />
+          </button>
         </li>
       {/each}
     </ul>
-
-    <button type="button" class="add" onclick={add}>
-      <Plus size={18} /> Eintrag hinzufügen
-    </button>
   {/if}
-
-  {#snippet footer()}
-    <button type="button" class="secondary" onclick={onClose}>Verwerfen</button>
-    <button type="button" class="primary" onclick={save}>Speichern</button>
-  {/snippet}
 </Modal>
+
+<SymptomSheet
+  open={open && picking}
+  enteredIds={configuredIds}
+  {onPick}
+  onClose={() => (picking = false)}
+/>
 
 <style>
   .hint { color: var(--c-text-dim); font-size: var(--fs-sm); margin: 0 0 var(--sp-4); }
-  .items { list-style: none; margin: 0 0 var(--sp-3); padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
-  .item { display: flex; align-items: center; gap: var(--sp-2); }
-  .sym-select {
-    flex: 1; min-width: 0;
+  .add {
+    display: inline-flex; align-items: center; gap: var(--sp-2);
+    width: 100%; justify-content: center;
+    border: 1px dashed var(--c-border-strong); background: none; color: var(--c-text);
+    border-radius: var(--r-2); padding: var(--sp-3); cursor: pointer;
+    font-size: var(--fs-sm); font-weight: var(--fw-medium);
+    margin-bottom: var(--sp-4);
+  }
+  .empty { font-size: var(--fs-sm); color: var(--c-text-dim); text-align: center; padding: var(--sp-4); }
+  .items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+  .item {
+    display: flex; align-items: center; gap: var(--sp-2);
     padding: var(--sp-2);
     border: 1px solid var(--c-border);
     border-radius: var(--r-2);
-    background: var(--c-surface); color: var(--c-text);
-    font-size: var(--fs-sm);
+    background: var(--c-surface);
   }
-  .row-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
-  .icon-action {
+  .item.dragging { opacity: 0.6; border-color: var(--c-text-dim); }
+  .handle {
     border: 0; background: none; color: var(--c-text-dim);
-    cursor: pointer; padding: var(--sp-1); display: flex; align-items: center;
+    cursor: grab; padding: var(--sp-1); display: flex; align-items: center;
+    touch-action: none;
   }
-  .icon-action:hover:not(:disabled) { color: var(--c-text); }
-  .icon-action:disabled { opacity: 0.3; cursor: default; }
-  .icon-action.danger:hover { color: var(--c-danger, #ef4444); }
-  .add {
-    display: inline-flex; align-items: center; gap: var(--sp-2);
-    border: 1px dashed var(--c-border-strong); background: none; color: var(--c-text);
-    border-radius: var(--r-2); padding: var(--sp-2) var(--sp-3); cursor: pointer;
-    font-size: var(--fs-sm);
+  .handle:active { cursor: grabbing; }
+  .name { flex: 1; min-width: 0; font-size: var(--fs-md); }
+  .name.missing { color: var(--c-text-dim); font-style: italic; }
+  .trash {
+    border: 0; background: none; color: var(--c-text-dim);
+    cursor: pointer; padding: var(--sp-1); display: flex; align-items: center; flex-shrink: 0;
   }
-  .primary { background: var(--c-primary); color: var(--c-primary-contrast); border: 0; padding: var(--sp-3); border-radius: var(--r-2); font-weight: var(--fw-bold); cursor: pointer; }
-  .secondary { background: var(--c-surface-2); color: var(--c-text); border: 1px solid var(--c-border); padding: var(--sp-3); border-radius: var(--r-2); cursor: pointer; }
+  .trash:hover { color: var(--c-danger, #ef4444); }
 </style>
