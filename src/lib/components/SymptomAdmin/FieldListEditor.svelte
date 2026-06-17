@@ -18,7 +18,8 @@
   const ADD_ORDER: FieldType[] = ['slider', 'number', 'select', 'text'];
 
   const hasEnabled = $derived(fields.some((f) => !f.deleted));
-  let addOpen = $state(false);
+  // Add-menu starts open so the type buttons are immediately accessible
+  let addOpen = $state(true);
 
   function patch(id: string, p: Partial<MetaField>) {
     onFieldsChange(fields.map((f) => (f.id === id ? ({ ...f, ...p } as MetaField) : f)));
@@ -181,7 +182,7 @@
     {#if addOpen}
       <div class="add-menu" role="menu">
         {#each ADD_ORDER as t}
-          <button type="button" role="menuitem" aria-label="{TYPE_LABELS[t]} hinzufügen" onclick={() => add(t)}>{TYPE_LABELS[t]}</button>
+          <button type="button" aria-label="{TYPE_LABELS[t]} hinzufügen" onclick={() => add(t)}>{TYPE_LABELS[t]}</button>
         {/each}
       </div>
     {/if}
