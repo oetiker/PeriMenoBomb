@@ -4,6 +4,7 @@ import { tick } from 'svelte';
 import SymptomEditModal from './SymptomEditModal.svelte';
 import { resetDatabase, db } from '$lib/db';
 import { createSymptom } from '$lib/db/symptoms';
+import { newField } from '$lib/db/fields';
 
 describe('SymptomEditModal', () => {
   beforeEach(() => resetDatabase());
@@ -22,18 +23,16 @@ describe('SymptomEditModal', () => {
     expect(after?.name).toBe('B');
   });
 
-  it('saves toggled comment.enabled and daily=true', async () => {
-    const sym = await createSymptom({ name: 'S' });
+  it('saves daily=true when toggled via FieldListEditor', async () => {
+    // Seed a slider field so FieldListEditor shows the "Täglich erfassen" checkbox.
+    const sliderField = newField('slider');
+    const sym = await createSymptom({ name: 'S', fields: [sliderField] });
     const onClose = vi.fn();
-    const { getAllByLabelText, getByLabelText, getByText } = render(SymptomEditModal, {
+    const { getByLabelText, getByText } = render(SymptomEditModal, {
       props: { open: true, symptom: sym, isNew: false, onClose }
     });
 
-    // Toggle comment Aktiv (4th Aktiv checkbox: slider, number, select, comment).
-    const aktiv = getAllByLabelText('Aktiv') as HTMLInputElement[];
-    await fireEvent.click(aktiv[3]);
-
-    // Daily becomes visible; tick it.
+    // "Täglich erfassen" is rendered by FieldListEditor when at least one field is active.
     const daily = getByLabelText('Täglich erfassen');
     await fireEvent.click(daily);
 
@@ -42,7 +41,9 @@ describe('SymptomEditModal', () => {
     await new Promise((r) => setTimeout(r, 30));
 
     const stored = await db.symptoms.get(sym.id);
-    expect(stored?.inputs.comment.enabled).toBe(true);
     expect(stored?.daily).toBe(true);
+    // The fields array must be persisted with the original field intact.
+    expect(stored?.fields).toHaveLength(1);
+    expect(stored?.fields[0].id).toBe(sliderField.id);
   });
 });
