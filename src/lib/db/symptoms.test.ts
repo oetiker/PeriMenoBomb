@@ -156,7 +156,7 @@ describe('listDailySymptomsForDate', () => {
   beforeEach(() => resetDatabase());
 
   it('returns daily + enabled-field symptoms without entry for the date, in tree order', async () => {
-    const a = await createSymptom({ name: 'A' });                                           // not daily
+    await createSymptom({ name: 'A' });                                                     // not daily
     const b = await createSymptom({ name: 'B' });                                           // daily but no fields → excluded
     const c = await createSymptom({ name: 'C', fields: [newField('slider')] });             // daily + slider → included
     const d = await createSymptom({ name: 'D', fields: [newField('text')] });               // daily + text → included but archived

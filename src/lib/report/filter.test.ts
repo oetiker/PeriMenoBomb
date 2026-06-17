@@ -5,13 +5,11 @@ import type { Entry, Symptom } from '$lib/db';
 const sym = (id: string, tagIds: string[] = []): Symptom => ({
   id, name: id, color: '#000', icon: '⚪', tagIds, parentId: null, sortIndex: 0,
   depth: 0, isFolder: false, archived: false, createdAt: 0, updatedAt: 0,
-  inputs: { slider: { enabled: false, required: false, lowLabel: '', highLabel: '' },
-            number: { enabled: false, required: false, unit: '', integer: true },
-            comment: { enabled: false, required: false } },
+  fields: [],
   daily: false
 });
 const ent = (date: string, symptomId: string): Entry => ({
-  id: `${date}__${symptomId}`, date, symptomId, sliderValue: null, numberValue: null, comment: '', updatedAt: 0
+  id: `${date}__${symptomId}`, date, symptomId, values: {}, updatedAt: 0
 });
 
 const symptoms = new Map<string, Symptom>([

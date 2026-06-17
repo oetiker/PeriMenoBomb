@@ -79,9 +79,7 @@
         await upsertEntry({
           date: original.date,
           symptomId: original.symptomId,
-          sliderValue: original.sliderValue,
-          numberValue: original.numberValue,
-          comment: original.comment
+          values: original.values
         });
       }
     });
