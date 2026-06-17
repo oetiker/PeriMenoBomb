@@ -16,7 +16,8 @@ export interface Symptom {
   archived: boolean;
   createdAt: number;
   updatedAt: number;
-  inputs:    SymptomInputs;
+  /** Ordered metadata fields. Empty for new symptoms until the author adds some. */
+  fields: MetaField[];
   daily:     boolean;
   /** When true, Badge recolours the emoji to the symptom's chosen hue. When
       false, the native colourful emoji shows through. Per-symptom so users can
@@ -53,36 +54,38 @@ export interface SelectOption {
   deleted?: boolean;
 }
 
-export interface SymptomInputs {
-  slider:  { enabled: boolean; required: boolean; lowLabel: string; highLabel: string };
-  number:  { enabled: boolean; required: boolean; unit: string; integer: boolean };
-  comment: { enabled: boolean; required: boolean };
-  /** Single-choice dropdown with author-defined options. Optional in the type
-      because pre-v5 records are upgraded lazily; the v5 hook backfills it and
-      defaultSymptomInputs() always includes it for new symptoms. */
-  select?: { enabled: boolean; required: boolean; options: SelectOption[] };
-}
+export type FieldType = 'slider' | 'number' | 'text' | 'select';
 
-export function defaultSymptomInputs(): SymptomInputs {
-  return {
-    slider:  { enabled: false, required: false, lowLabel: '', highLabel: '' },
-    number:  { enabled: false, required: false, unit: '', integer: true },
-    comment: { enabled: false, required: false },
-    select:  { enabled: false, required: false, options: [] }
-  };
+export interface BaseField {
+  /** Stable identity (newId()); never changes across label edits or reorder. */
+  id: string;
+  /** Always present, customizable display label. */
+  label: string;
+  required: boolean;
+  /** Soft-delete: hidden from the editor and logging form but kept so historical
+      entry values still resolve and the field can be restored. */
+  deleted?: boolean;
+}
+export interface SliderField extends BaseField { type: 'slider'; lowLabel: string; highLabel: string }
+export interface NumberField extends BaseField { type: 'number'; unit: string; integer: boolean }
+export interface TextField   extends BaseField { type: 'text' }
+export interface SelectField extends BaseField { type: 'select'; options: SelectOption[] }
+/** One ordered, UUID-keyed metadata field on a symptom. A symptom may carry any
+    number of these, in any mix of types. */
+export type MetaField = SliderField | NumberField | TextField | SelectField;
+
+export function defaultSymptomFields(): MetaField[] {
+  return [];
 }
 
 export interface Entry {
   id:          string;
   date:        string;
   symptomId:   string;
-  sliderValue: number | null;
-  numberValue: number | null;
-  comment:     string;
-  /** Chosen select-option key (see SymptomInputs.select). Optional because
-      pre-v5 entries and non-select entries have no choice; treat
-      null/undefined as "nothing selected". */
-  selectKey?:  string | null;
+  /** Logged values keyed by field id. slider/number → number|null; text →
+      string; select → chosen option key (string) | null. A missing key means
+      the field was not logged. */
+  values: Record<string, number | string | null>;
   updatedAt:   number;
 }
 
