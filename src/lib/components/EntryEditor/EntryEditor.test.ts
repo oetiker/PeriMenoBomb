@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import EntryEditor from './EntryEditor.svelte';
-import { db, defaultSymptomInputs, resetDatabase, type Symptom } from '$lib/db';
+import { db, resetDatabase, type Symptom, type MetaField } from '$lib/db';
+import { newField } from '$lib/db/fields';
 import { snackbar } from '$lib/stores/snackbar.svelte';
 
 function makeSymptom(p: Partial<Symptom> = {}): Symptom {
@@ -10,7 +11,7 @@ function makeSymptom(p: Partial<Symptom> = {}): Symptom {
     id: 's1', name: 'X', color: '#000', icon: 'circle',
     tagIds: [], parentId: null, sortIndex: 0, depth: 0,
     isFolder: false, archived: false, createdAt: 0, updatedAt: 0,
-    inputs: defaultSymptomInputs(), daily: false, ...p
+    fields: [], daily: false, ...p
   };
 }
 
@@ -31,15 +32,12 @@ describe('EntryEditor', () => {
     await new Promise((r) => setTimeout(r, 30));
     const entry = await db.entries.get('2026-05-28__s1');
     expect(entry).toBeTruthy();
-    expect(entry?.sliderValue).toBeNull();
-    expect(entry?.numberValue).toBeNull();
-    expect(entry?.comment).toBe('');
+    expect(entry?.values).toEqual({});
   });
 
-  it('Speichern is disabled while slider is required and value is null', async () => {
-    const inputs = defaultSymptomInputs();
-    inputs.slider.enabled = true; inputs.slider.required = true;
-    const s = makeSymptom({ inputs });
+  it('Speichern is disabled while a slider field is required and value is null', async () => {
+    const slider: MetaField = { ...newField('slider'), required: true };
+    const s = makeSymptom({ fields: [slider] });
     const { getByText } = render(EntryEditor, {
       props: { open: true, date: '2026-05-28', symptom: s, onClose: () => {} }
     });
@@ -62,10 +60,12 @@ describe('EntryEditor', () => {
   });
 
   it('Löschen removes an existing entry and shows an undo snackbar', async () => {
-    const s = makeSymptom({ name: 'Müdigkeit' });
+    const slider = newField('slider');
+    const text = newField('text');
+    const s = makeSymptom({ name: 'Müdigkeit', fields: [slider, text] });
     await db.entries.put({
       id: '2026-05-28__s1', date: '2026-05-28', symptomId: 's1',
-      sliderValue: 80, numberValue: null, comment: 'müde',
+      values: { [slider.id]: 80, [text.id]: 'müde' },
       updatedAt: 1
     });
     const onClose = vi.fn();
@@ -85,41 +85,40 @@ describe('EntryEditor', () => {
     await snackbar.invokeAction();
     await new Promise((r) => setTimeout(r, 30));
     const restored = await db.entries.get('2026-05-28__s1');
-    expect(restored?.sliderValue).toBe(80);
-    expect(restored?.comment).toBe('müde');
+    expect(restored?.values[slider.id]).toBe(80);
+    expect(restored?.values[text.id]).toBe('müde');
   });
 
-  it('renders only enabled inputs', () => {
-    const inputs = defaultSymptomInputs();
-    inputs.comment.enabled = true;
-    const s = makeSymptom({ inputs });
+  it('renders only non-deleted fields', () => {
+    const text = newField('text');
+    const deleted: MetaField = { ...newField('slider'), deleted: true };
+    const s = makeSymptom({ fields: [text, deleted] });
     const { queryByPlaceholderText, getByPlaceholderText } = render(EntryEditor, {
       props: { open: true, date: '2026-05-28', symptom: s, onClose: () => {} }
     });
     expect(getByPlaceholderText('z.B. Auslöser, Umstände…')).toBeTruthy();
-    // Slider track not in DOM (since slider is disabled)
+    // Deleted slider's track is not in the DOM.
     expect(queryByPlaceholderText(/leicht/)).toBeNull();
   });
 
   it('restores initial values when initial prop is provided', async () => {
+    const slider = newField('slider');
+    const text = newField('text');
     // Pre-seed an entry that should be IGNORED when initial is provided.
     await db.entries.put({
       id: '2026-05-28__s1', date: '2026-05-28', symptomId: 's1',
-      sliderValue: 99, numberValue: null, comment: 'persisted',
+      values: { [slider.id]: 99, [text.id]: 'persisted' },
       updatedAt: 1
     });
 
-    const inputs = defaultSymptomInputs();
-    inputs.slider.enabled = true;
-    inputs.comment.enabled = true;
-    const s = makeSymptom({ inputs });
+    const s = makeSymptom({ fields: [slider, text] });
 
     const { container } = render(EntryEditor, {
       props: {
         open: true,
         date: '2026-05-28',
         symptom: s,
-        initial: { sliderValue: 42, numberValue: null, comment: 'restored', selectKey: null },
+        initial: { values: { [slider.id]: 42, [text.id]: 'restored' } },
         onClose: () => {}
       }
     });

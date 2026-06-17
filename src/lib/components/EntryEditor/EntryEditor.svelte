@@ -21,17 +21,18 @@
     date: string;
     symptom: Symptom;
     /** Optional initial values when restoring from openDialog. */
-    initial?: { sliderValue: number | null; numberValue: number | null; comment: string; selectKey: string | null };
+    initial?: { values: Record<string, number | string | null> };
     onClose: () => void;
   };
   let { open, date, symptom, initial, onClose }: Props = $props();
 
   let workingDate = $state(untrack(() => date));
-  let sliderValue = $state<number | null>(untrack(() => initial?.sliderValue ?? null));
-  let numberValue = $state<number | null>(untrack(() => initial?.numberValue ?? null));
-  let comment = $state(untrack(() => initial?.comment ?? ''));
-  let selectKey = $state<string | null>(untrack(() => initial?.selectKey ?? null));
+  let values = $state<Record<string, number | string | null>>(untrack(() => ({ ...(initial?.values ?? {}) })));
   let configOpen = $state(false);
+
+  function setValue(id: string, v: number | string | null) {
+    values = { ...values, [id]: v };
+  }
 
   // Load existing entry once on open. If `initial` is provided (restore path), skip — restored values win.
   $effect(() => {
@@ -40,17 +41,7 @@
     if (initial) return;
     (async () => {
       const e = await getEntry(date, symptom.id);
-      if (e) {
-        sliderValue = e.sliderValue;
-        numberValue = e.numberValue;
-        comment = e.comment;
-        selectKey = e.selectKey ?? null;
-      } else {
-        sliderValue = null;
-        numberValue = null;
-        comment = '';
-        selectKey = null;
-      }
+      values = e ? { ...e.values } : {};
     })();
   });
 
@@ -71,10 +62,7 @@
     const snapshot = untrack(() => ({
       date: workingDate,
       symptomId: symptom.id,
-      sliderValue,
-      numberValue,
-      comment,
-      selectKey
+      values: $state.snapshot(values)
     }));
     void persistDialog({
       kind: 'entry-editor',
@@ -85,17 +73,17 @@
 
   $effect(() => {
     if (!open) return;
-    void updateDialogPayload({ date: workingDate, sliderValue, numberValue, comment, selectKey });
+    void updateDialogPayload({ date: workingDate, values: $state.snapshot(values) });
   });
 
-  const validation = $derived(validateEntry(symptom, { sliderValue, numberValue, comment, selectKey }));
+  const validation = $derived(validateEntry(symptom, values));
 
   async function onSave() {
     if (!validation.ok) return;
     await upsertEntry({
       date: workingDate,
       symptomId: symptom.id,
-      sliderValue, numberValue, comment, selectKey
+      values: $state.snapshot(values)
     });
     await clearDialog();
     onClose();
@@ -117,10 +105,7 @@
           await upsertEntry({
             date: existing.date,
             symptomId: existing.symptomId,
-            sliderValue: existing.sliderValue,
-            numberValue: existing.numberValue,
-            comment: existing.comment,
-            selectKey: existing.selectKey ?? null
+            values: existing.values
           });
         }
       });
@@ -154,7 +139,7 @@
       payload: {
         date: workingDate,
         symptomId: symptom.id,
-        sliderValue, numberValue, comment, selectKey
+        values: $state.snapshot(values)
       }
     });
   }
@@ -181,60 +166,44 @@
     </label>
   </section>
 
-  {#if symptom.inputs.slider.enabled}
+  {#each symptom.fields.filter((f) => !f.deleted) as field (field.id)}
     <section>
       <div class="caption">
-        Intensität
-        {#if symptom.inputs.slider.required}<span class="req">*</span>{/if}
+        {field.label || symptom.name}
+        {#if field.required}<span class="req">*</span>{/if}
       </div>
-      <SliderInput
-        value={sliderValue}
-        lowLabel={symptom.inputs.slider.lowLabel}
-        highLabel={symptom.inputs.slider.highLabel}
-        step={settings.sliderStep}
-        onChange={(v) => (sliderValue = v)}
-      />
+      {#if field.type === 'slider'}
+        <SliderInput
+          value={(values[field.id] ?? null) as number | null}
+          lowLabel={field.lowLabel}
+          highLabel={field.highLabel}
+          step={settings.sliderStep}
+          onChange={(v) => setValue(field.id, v)}
+        />
+      {:else if field.type === 'number'}
+        <NumberInput
+          value={(values[field.id] ?? null) as number | null}
+          unit={field.unit}
+          integer={field.integer}
+          onChange={(v) => setValue(field.id, v)}
+        />
+      {:else if field.type === 'select'}
+        <SelectInput
+          value={(values[field.id] ?? null) as string | null}
+          options={field.options}
+          onChange={(k) => setValue(field.id, k)}
+        />
+      {:else}
+        <textarea
+          class="comment"
+          rows={3}
+          placeholder="z.B. Auslöser, Umstände…"
+          value={(values[field.id] ?? '') as string}
+          oninput={(e) => setValue(field.id, (e.currentTarget as HTMLTextAreaElement).value)}
+        ></textarea>
+      {/if}
     </section>
-  {/if}
-
-  {#if symptom.inputs.number.enabled}
-    <section>
-      <div class="caption">
-        Anzahl
-        {#if symptom.inputs.number.required}<span class="req">*</span>{/if}
-      </div>
-      <NumberInput
-        value={numberValue}
-        unit={symptom.inputs.number.unit}
-        integer={symptom.inputs.number.integer}
-        onChange={(v) => (numberValue = v)}
-      />
-    </section>
-  {/if}
-
-  {#if symptom.inputs.select?.enabled}
-    <section>
-      <div class="caption">
-        Auswahl
-        {#if symptom.inputs.select.required}<span class="req">*</span>{/if}
-      </div>
-      <SelectInput
-        value={selectKey}
-        options={symptom.inputs.select.options}
-        onChange={(k) => (selectKey = k)}
-      />
-    </section>
-  {/if}
-
-  {#if symptom.inputs.comment.enabled}
-    <section>
-      <div class="caption">
-        Kommentar
-        {#if symptom.inputs.comment.required}<span class="req">*</span>{/if}
-      </div>
-      <textarea class="comment" rows={3} placeholder="z.B. Auslöser, Umstände…" bind:value={comment}></textarea>
-    </section>
-  {/if}
+  {/each}
 
   {#snippet footer()}
     <button type="button" class="discard" onclick={onDelete}>Löschen</button>
