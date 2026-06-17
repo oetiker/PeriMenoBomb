@@ -1,11 +1,11 @@
 import type { Symptom, Tag, Entry } from '$lib/db';
-import { selectLabelFor } from '$lib/db/entries';
+import { entryFieldDisplays } from '$lib/db/fields';
 import type { DayGroup } from './filter';
 
 export interface PdfRow {
   date: string;
-  /** [Symptom, Intensität, Anzahl, Kommentar, Tags] */
-  cells: [string, string, string, string, string];
+  /** [Symptom, Werte, Tags] */
+  cells: [string, string, string];
 }
 
 export interface PdfHeader {
@@ -15,19 +15,9 @@ export interface PdfHeader {
   generatedLabel: string;
 }
 
-/** First value column: slider intensity and/or the chosen select label. A
-    symptom usually uses one or the other; if it has both, they're joined. */
-function intensityCell(s: Symptom, e: Entry): string {
-  const parts: string[] = [];
-  if (s.inputs.slider.enabled) parts.push(e.sliderValue === null ? 'unspez' : String(e.sliderValue));
-  const sel = selectLabelFor(s, e);
-  if (sel) parts.push(sel);
-  return parts.join(' / ');
-}
-function numberCell(s: Symptom, v: number | null): string {
-  if (!s.inputs.number.enabled || v === null) return '';
-  const unit = s.inputs.number.unit;
-  return unit ? `${v} ${unit}` : String(v);
+/** All field values for an entry, "Label: Wert" joined with " · ". */
+function valuesCell(s: Symptom, e: Entry): string {
+  return entryFieldDisplays(s, e).map((d) => `${d.field.label}: ${d.text}`).join(' · ');
 }
 function tagsCell(s: Symptom, tags: Map<string, Tag>): string {
   return s.tagIds.map((id) => tags.get(id)?.name).filter(Boolean).join(', ');
@@ -46,13 +36,7 @@ export function entriesToPdfBody(
       if (!s) continue;
       rows.push({
         date: g.date,
-        cells: [
-          s.name,
-          intensityCell(s, e),
-          numberCell(s, e.numberValue),
-          e.comment ?? '',
-          tagsCell(s, tags)
-        ]
+        cells: [s.name, valuesCell(s, e), tagsCell(s, tags)]
       });
     }
   }
@@ -84,7 +68,7 @@ export async function buildEntriesPdfBlob(
     if (body.length === 0) continue;
     autoTable(doc, {
       startY,
-      head: [[g.date, 'Intensität', 'Anzahl', 'Kommentar', 'Tags']],
+      head: [[g.date, 'Werte', 'Tags']],
       body,
       styles: { fontSize: 9, cellPadding: 4 },
       headStyles: { fillColor: [107, 74, 138] },
