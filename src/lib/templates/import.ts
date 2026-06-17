@@ -1,17 +1,10 @@
-import { db, defaultSymptomInputs, type SymptomInputs } from '$lib/db';
+import { db, defaultSymptomFields, type MetaField } from '$lib/db';
 import { createTag } from '$lib/db/tags';
 import { createSymptom } from '$lib/db/symptoms';
 import type { Template, TemplateSymptom } from './perimeno-default';
 
-function mergeInputs(partial?: Partial<SymptomInputs>): SymptomInputs {
-  const base = defaultSymptomInputs();
-  if (!partial) return base;
-  return {
-    slider:  { ...base.slider,  ...(partial.slider  ?? {}) },
-    number:  { ...base.number,  ...(partial.number  ?? {}) },
-    comment: { ...base.comment, ...(partial.comment ?? {}) },
-    select:  { ...base.select!, ...(partial.select  ?? {}) }
-  };
+function fieldsFor(s: TemplateSymptom): MetaField[] {
+  return s.fields ?? defaultSymptomFields();
 }
 
 export async function importTemplate(t: Template): Promise<void> {
@@ -30,7 +23,7 @@ export async function importTemplate(t: Template): Promise<void> {
         isFolder,
         parentId,
         tagIds: (s.tags ?? []).map((n) => tagIdByName.get(n)).filter((x): x is string => !!x),
-        inputs: isFolder ? undefined : mergeInputs(s.inputs),
+        fields: isFolder ? undefined : fieldsFor(s),
         daily: isFolder ? false : (s.daily ?? false)
       });
       if (s.children) for (const c of s.children) await recur(c, created.id);
