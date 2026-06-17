@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Dexie from 'dexie';
 import 'fake-indexeddb/auto';
-import { defaultSymptomInputs, upgradeV1toV2, upgradeV4toV5 } from './index';
+import { upgradeV1toV2, upgradeV4toV5, upgradeV5toV6 } from './index';
 
 const STORES = {
   symptoms: 'id, parentId, [parentId+sortIndex], archived',
@@ -67,7 +67,12 @@ describe('Dexie schema v1 → v2 upgrade', () => {
     expect(entries).toEqual([]);
 
     const sym = await v2.table('symptoms').get('s1');
-    expect(sym.inputs).toEqual(defaultSymptomInputs());
+    expect(sym.inputs).toEqual({
+      slider:  { enabled: false, required: false, lowLabel: '', highLabel: '' },
+      number:  { enabled: false, required: false, unit: '', integer: true },
+      comment: { enabled: false, required: false },
+      select:  { enabled: false, required: false, options: [] }
+    });
     expect(sym.daily).toBe(false);
 
     const od = await v2.table('meta').get('openDialog');
@@ -106,5 +111,52 @@ describe('Dexie schema v4 → v5 upgrade', () => {
     const sym = await v5.table('symptoms').get('s1');
     expect(sym.inputs.select).toEqual({ enabled: false, required: false, options: [] });
     v5.close();
+  });
+});
+
+describe('Dexie schema v5 → v6 upgrade', () => {
+  beforeEach(deleteDb);
+
+  it('converts inputs→fields, rewrites entry values, and remaps the cycle value series', async () => {
+    const v5 = new Dexie(DB_NAME);
+    v5.version(5).stores(STORES);
+    await v5.open();
+    await v5.table('symptoms').add({
+      id: 's1', name: 'Hitze', color: '#000', icon: '🔥', tagIds: [], parentId: null,
+      sortIndex: 0, depth: 0, isFolder: false, archived: false, createdAt: 1, updatedAt: 1,
+      daily: false, duotone: true, bg: true,
+      inputs: {
+        slider:  { enabled: true,  required: false, lowLabel: 'kurz', highLabel: 'lang' },
+        number:  { enabled: true,  required: true,  unit: 'Schübe', integer: true },
+        comment: { enabled: true,  required: false },
+        select:  { enabled: false, required: false, options: [] }
+      }
+    });
+    await v5.table('entries').add({
+      id: '2026-06-01__s1', date: '2026-06-01', symptomId: 's1',
+      sliderValue: 50, numberValue: 3, comment: 'warm', selectKey: null, updatedAt: 1
+    });
+    await v5.table('meta').add({ key: 'report.cycle.valueId', value: 's1' });
+    v5.close();
+
+    const v6 = new Dexie(DB_NAME);
+    v6.version(5).stores(STORES);
+    v6.version(6).stores(STORES).upgrade(upgradeV5toV6);
+    await v6.open();
+
+    const sym = await v6.table('symptoms').get('s1');
+    expect(sym.inputs).toBeUndefined();
+    expect(sym.fields.map((f: { type: string; label: string }) => `${f.type}:${f.label}`))
+      .toEqual(['slider:Intensität', 'number:Schübe', 'text:Notiz']);
+    const sliderId = sym.fields[0].id, numberId = sym.fields[1].id, textId = sym.fields[2].id;
+    expect(sym.fields[1].required).toBe(true);
+
+    const e = await v6.table('entries').get('2026-06-01__s1');
+    expect(e.values).toEqual({ [sliderId]: 50, [numberId]: 3, [textId]: 'warm' });
+    expect(e.sliderValue).toBeUndefined();
+
+    const meta = await v6.table('meta').get('report.cycle.valueFieldId');
+    expect(meta.value).toBe(sliderId);
+    v6.close();
   });
 });

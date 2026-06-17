@@ -1,5 +1,6 @@
 import Dexie, { type Table, type Transaction } from 'dexie';
 import { LUCIDE_TO_EMOJI, DEFAULT_SYMPTOM_EMOJI, looksLikeEmoji } from '$lib/icons/emoji';
+import { newId } from '$lib/utils/uuid';
 
 export interface Symptom {
   id: string;
@@ -132,13 +133,24 @@ export class PeriMenoDB extends Dexie {
       entries:  'id, date, symptomId, [date+symptomId]',
       meta:     'key'
     }).upgrade(upgradeV4toV5);
+    this.version(6).stores({
+      symptoms: 'id, parentId, [parentId+sortIndex], archived',
+      tags:     'id, name',
+      entries:  'id, date, symptomId, [date+symptomId]',
+      meta:     'key'
+    }).upgrade(upgradeV5toV6);
   }
 }
 
 export async function upgradeV1toV2(tx: Transaction): Promise<void> {
   await tx.table('entries').clear();
-  await tx.table('symptoms').toCollection().modify((s: Partial<Symptom>) => {
-    if (!s.inputs) s.inputs = defaultSymptomInputs();
+  await tx.table('symptoms').toCollection().modify((s: Record<string, unknown>) => {
+    if (!s.inputs) s.inputs = {
+      slider:  { enabled: false, required: false, lowLabel: '', highLabel: '' },
+      number:  { enabled: false, required: false, unit: '', integer: true },
+      comment: { enabled: false, required: false },
+      select:  { enabled: false, required: false, options: [] }
+    };
     if (typeof s.daily !== 'boolean') s.daily = false;
   });
   await tx.table('meta').delete('openDialog');
@@ -147,8 +159,8 @@ export async function upgradeV1toV2(tx: Transaction): Promise<void> {
 export async function upgradeV2toV3(tx: Transaction): Promise<void> {
   // Lucide icons → system emojis. Unknown icons fall back to ⚪ (clearly "unset"
   // so users notice and re-pick) rather than guessing wrong.
-  await tx.table('symptoms').toCollection().modify((s: Partial<Symptom>) => {
-    if (s.icon && !looksLikeEmoji(s.icon)) {
+  await tx.table('symptoms').toCollection().modify((s: Record<string, unknown>) => {
+    if (s.icon && typeof s.icon === 'string' && !looksLikeEmoji(s.icon)) {
       s.icon = LUCIDE_TO_EMOJI[s.icon] ?? DEFAULT_SYMPTOM_EMOJI;
     }
     if (typeof s.duotone !== 'boolean') s.duotone = true;
@@ -158,7 +170,7 @@ export async function upgradeV2toV3(tx: Transaction): Promise<void> {
 export async function upgradeV3toV4(tx: Transaction): Promise<void> {
   // Default existing symptoms to "with circle background" — matches the
   // pre-v4 visual.
-  await tx.table('symptoms').toCollection().modify((s: Partial<Symptom>) => {
+  await tx.table('symptoms').toCollection().modify((s: Record<string, unknown>) => {
     if (typeof s.bg !== 'boolean') s.bg = true;
   });
 }
@@ -166,11 +178,84 @@ export async function upgradeV3toV4(tx: Transaction): Promise<void> {
 export async function upgradeV4toV5(tx: Transaction): Promise<void> {
   // Add the (disabled, empty) select-input config to existing symptoms so
   // every record carries the full input shape.
-  await tx.table('symptoms').toCollection().modify((s: Partial<Symptom>) => {
-    if (s.inputs && !s.inputs.select) {
-      s.inputs.select = { enabled: false, required: false, options: [] };
+  await tx.table('symptoms').toCollection().modify((s: Record<string, unknown>) => {
+    const inputs = s.inputs as Record<string, unknown> | undefined;
+    if (inputs && !inputs.select) {
+      inputs.select = { enabled: false, required: false, options: [] };
     }
   });
+}
+
+/** Legacy fixed input shape used in v2–v5. Kept here only so upgrade functions
+    remain self-contained and independent of current types. */
+interface SymptomInputsLegacy {
+  slider?:  { enabled: boolean; required: boolean; lowLabel: string; highLabel: string };
+  number?:  { enabled: boolean; required: boolean; unit: string; integer: boolean };
+  comment?: { enabled: boolean; required: boolean };
+  select?:  { enabled: boolean; required: boolean; options: SelectOption[] };
+}
+
+type SlotMap = { slider?: string; number?: string; select?: string; comment?: string };
+
+/** v5→v6: replace the fixed `inputs` struct with an ordered `fields` array, and
+    rewrite each entry's fixed value columns into a field-keyed `values` map.
+    Field order follows the old cascade (slider → number → select → comment) so
+    display order stays sensible. Each new field gets a fresh UUID and a German
+    default label the author can rename. */
+export async function upgradeV5toV6(tx: Transaction): Promise<void> {
+  const slots = new Map<string, SlotMap>();
+
+  await tx.table('symptoms').toCollection().modify((s: Record<string, unknown>) => {
+    const inp = s.inputs as SymptomInputsLegacy | undefined;
+    const fields: MetaField[] = [];
+    const map: SlotMap = {};
+    if (inp?.slider?.enabled) {
+      const id = newId();
+      fields.push({ id, type: 'slider', label: 'Intensität', required: inp.slider.required, lowLabel: inp.slider.lowLabel, highLabel: inp.slider.highLabel });
+      map.slider = id;
+    }
+    if (inp?.number?.enabled) {
+      const id = newId();
+      fields.push({ id, type: 'number', label: inp.number.unit || 'Wert', required: inp.number.required, unit: inp.number.unit, integer: inp.number.integer });
+      map.number = id;
+    }
+    if (inp?.select?.enabled) {
+      const id = newId();
+      fields.push({ id, type: 'select', label: 'Auswahl', required: inp.select.required, options: inp.select.options });
+      map.select = id;
+    }
+    if (inp?.comment?.enabled) {
+      const id = newId();
+      fields.push({ id, type: 'text', label: 'Notiz', required: inp.comment.required });
+      map.comment = id;
+    }
+    s.fields = fields;
+    delete s.inputs;
+    slots.set(s.id as string, map);
+  });
+
+  await tx.table('entries').toCollection().modify((e: Record<string, unknown>) => {
+    const map = slots.get(e.symptomId as string);
+    const values: Record<string, number | string | null> = {};
+    if (map) {
+      if (map.slider !== undefined && e.sliderValue !== undefined) values[map.slider] = e.sliderValue as number | null;
+      if (map.number !== undefined && e.numberValue !== undefined) values[map.number] = e.numberValue as number | null;
+      if (map.select !== undefined && (e.selectKey ?? null) !== null) values[map.select] = e.selectKey as string;
+      if (map.comment !== undefined && typeof e.comment === 'string' && e.comment.length > 0) values[map.comment] = e.comment;
+    }
+    e.values = values;
+    delete e.sliderValue;
+    delete e.numberValue;
+    delete e.comment;
+    delete e.selectKey;
+  });
+
+  const valueRow = await tx.table('meta').get('report.cycle.valueId');
+  if (valueRow && typeof valueRow.value === 'string') {
+    const map = slots.get(valueRow.value);
+    const fieldId = map?.slider ?? map?.number ?? map?.select;
+    if (fieldId) await tx.table('meta').put({ key: 'report.cycle.valueFieldId', value: fieldId });
+  }
 }
 
 export const db = new PeriMenoDB();
