@@ -42,7 +42,7 @@ describe('openDialog store', () => {
   });
 
   it('updateDialogPayload no-ops when nothing persisted', async () => {
-    await expect(updateDialogPayload({ comment: 'x' })).resolves.toBeUndefined();
+    await expect(updateDialogPayload({ values: { x: null } })).resolves.toBeUndefined();
     expect(await loadOpenDialog()).toBeNull();
   });
 });
