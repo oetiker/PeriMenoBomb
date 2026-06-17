@@ -11,6 +11,8 @@ describe('FieldListEditor', () => {
     const { getByRole } = render(FieldListEditor, {
       props: { fields, daily: false, onFieldsChange, onDailyChange: vi.fn() }
     });
+    // The add-menu is a disclosure: open it first, then pick a type.
+    await fireEvent.click(getByRole('button', { name: 'Feld hinzufügen' }));
     await fireEvent.click(getByRole('button', { name: 'Zahl hinzufügen' }));
     expect(onFieldsChange).toHaveBeenCalled();
     expect(fields[0].type).toBe('number');

@@ -18,8 +18,8 @@
   const ADD_ORDER: FieldType[] = ['slider', 'number', 'select', 'text'];
 
   const hasEnabled = $derived(fields.some((f) => !f.deleted));
-  // Add-menu starts open so the type buttons are immediately accessible
-  let addOpen = $state(true);
+  // Add-menu is a disclosure: hidden until the user opens it via "Feld hinzufügen".
+  let addOpen = $state(false);
 
   function patch(id: string, p: Partial<MetaField>) {
     onFieldsChange(fields.map((f) => (f.id === id ? ({ ...f, ...p } as MetaField) : f)));
@@ -178,7 +178,7 @@
   </ul>
 
   <div class="add-wrap">
-    <button type="button" class="add" onclick={() => (addOpen = !addOpen)}><Plus size={18} /> Feld hinzufügen</button>
+    <button type="button" class="add" aria-haspopup="true" aria-expanded={addOpen} onclick={() => (addOpen = !addOpen)}><Plus size={18} /> Feld hinzufügen</button>
     {#if addOpen}
       <div class="add-menu" role="menu">
         {#each ADD_ORDER as t}
