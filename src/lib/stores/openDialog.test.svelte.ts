@@ -12,7 +12,7 @@ describe('openDialog store', () => {
     const s: OpenDialogState = {
       kind: 'entry-editor',
       route: '/day/2026-05-28',
-      payload: { date: '2026-05-28', symptomId: 'x', sliderValue: null, numberValue: null, comment: '', selectKey: null }
+      payload: { date: '2026-05-28', symptomId: 'x', values: {} }
     };
     await persistDialog(s);
     const row = await db.meta.get('openDialog');
@@ -23,19 +23,19 @@ describe('openDialog store', () => {
     const s: OpenDialogState = {
       kind: 'entry-editor',
       route: '/day/2026-05-28',
-      payload: { date: '2026-05-28', symptomId: 'x', sliderValue: null, numberValue: null, comment: '', selectKey: null }
+      payload: { date: '2026-05-28', symptomId: 'x', values: {} }
     };
     await persistDialog(s);
-    await updateDialogPayload({ comment: 'hello' });
+    await updateDialogPayload({ values: { comment: 'hello' } });
     const loaded = await loadOpenDialog();
     expect(loaded?.kind).toBe('entry-editor');
-    expect((loaded as Extract<OpenDialogState, { kind: 'entry-editor' }>).payload.comment).toBe('hello');
+    expect((loaded as Extract<OpenDialogState, { kind: 'entry-editor' }>).payload.values).toEqual({ comment: 'hello' });
   });
 
   it('clearDialog removes the row', async () => {
     await persistDialog({
       kind: 'entry-editor', route: '/day/2026-05-28',
-      payload: { date: '2026-05-28', symptomId: 'x', sliderValue: null, numberValue: null, comment: '', selectKey: null }
+      payload: { date: '2026-05-28', symptomId: 'x', values: {} }
     });
     await clearDialog();
     expect(await loadOpenDialog()).toBeNull();
