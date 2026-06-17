@@ -1,4 +1,4 @@
-import { db, type Symptom, type SymptomInputs, defaultSymptomInputs, entryKey } from './index';
+import { db, type Symptom, type MetaField, defaultSymptomFields, entryKey } from './index';
 import { newId } from '$lib/utils/uuid';
 import { DEFAULT_SYMPTOM_EMOJI, DEFAULT_FOLDER_EMOJI } from '$lib/icons/emoji';
 
@@ -9,7 +9,7 @@ export interface CreateSymptomInput {
   color?: string;
   icon?: string;
   tagIds?: string[];
-  inputs?: SymptomInputs;
+  fields?: MetaField[];
   daily?: boolean;
   duotone?: boolean;
   bg?: boolean;
@@ -52,7 +52,7 @@ export async function createSymptom(input: CreateSymptomInput): Promise<Symptom>
     archived: false,
     createdAt: now,
     updatedAt: now,
-    inputs: input.inputs ?? defaultSymptomInputs(),
+    fields: input.fields ?? defaultSymptomFields(),
     daily: input.daily ?? false,
     duotone: input.duotone ?? true,
     bg: input.bg ?? true
@@ -202,8 +202,8 @@ export async function reorderSiblings(parentId: string | null, orderedIds: strin
   });
 }
 
-export function hasEnabledInput(inputs: SymptomInputs): boolean {
-  return inputs.slider.enabled || inputs.number.enabled || inputs.comment.enabled || (inputs.select?.enabled ?? false);
+export function hasEnabledField(fields: MetaField[]): boolean {
+  return fields.some((f) => !f.deleted);
 }
 
 function flattenTreeOrder(tree: TreeNode[]): Symptom[] {
@@ -223,7 +223,7 @@ function flattenTreeOrder(tree: TreeNode[]): Symptom[] {
 export async function listDailySymptomsForDate(date: string): Promise<Symptom[]> {
   const tree = await listTree(); // already excludes archived
   const ordered = flattenTreeOrder(tree);
-  const eligible = ordered.filter((s) => !s.isFolder && s.daily && hasEnabledInput(s.inputs));
+  const eligible = ordered.filter((s) => !s.isFolder && s.daily && hasEnabledField(s.fields));
   if (eligible.length === 0) return [];
   const ids = eligible.map((s) => s.id);
   const entryKeys = ids.map((id) => entryKey(date, id));
