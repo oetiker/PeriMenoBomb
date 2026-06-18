@@ -21,7 +21,7 @@
   let sheetOpen = $state(false);
   let editing = $state<{ symptom: Symptom } | null>(null);
   let restoreInitial = $state<
-    | { sliderValue: number | null; numberValue: number | null; comment: string; selectKey: string | null; workingDate: string }
+    | { values: Record<string, number | string | null>; workingDate: string }
     | null
   >(null);
 
@@ -63,10 +63,7 @@
     if (!sym) return; // Symptom inzwischen archiviert/gelöscht — stillschweigend überspringen
     editing = { symptom: sym };
     restoreInitial = {
-      sliderValue: r.payload.sliderValue,
-      numberValue: r.payload.numberValue,
-      comment: r.payload.comment,
-      selectKey: r.payload.selectKey,
+      values: r.payload.values,
       workingDate: r.payload.date
     };
   });
@@ -102,9 +99,7 @@
       open={true}
       date={restoreInitial?.workingDate ?? currentDate.value}
       symptom={liveSymptom}
-      initial={restoreInitial
-        ? { sliderValue: restoreInitial.sliderValue, numberValue: restoreInitial.numberValue, comment: restoreInitial.comment, selectKey: restoreInitial.selectKey }
-        : undefined}
+      initial={restoreInitial ? { values: restoreInitial.values } : undefined}
       onClose={() => { editing = null; restoreInitial = null; }}
     />
   {/if}

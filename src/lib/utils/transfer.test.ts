@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetDatabase, db, defaultSymptomInputs } from '$lib/db';
+import { resetDatabase, db } from '$lib/db';
 import { exportAll, importAll, validateExportPayload } from './transfer';
 
 describe('transfer', () => {
@@ -7,8 +7,8 @@ describe('transfer', () => {
 
   it('round-trips an export through import', async () => {
     await db.tags.add({ id: 't1', name: 'körperlich', createdAt: 1 });
-    await db.symptoms.add({ id: 's1', name: 'A', color: '#000', icon: 'circle', tagIds: ['t1'], parentId: null, sortIndex: 0, depth: 0, isFolder: false, archived: false, createdAt: 1, updatedAt: 1, inputs: defaultSymptomInputs(), daily: false });
-    await db.entries.add({ id: '2026-05-27__s1', date: '2026-05-27', symptomId: 's1', sliderValue: 50, numberValue: null, comment: '', updatedAt: 1 });
+    await db.symptoms.add({ id: 's1', name: 'A', color: '#000', icon: 'circle', tagIds: ['t1'], parentId: null, sortIndex: 0, depth: 0, isFolder: false, archived: false, createdAt: 1, updatedAt: 1, fields: [], daily: false });
+    await db.entries.add({ id: '2026-05-27__s1', date: '2026-05-27', symptomId: 's1', values: { v1: 50 }, updatedAt: 1 });
 
     const payload = await exportAll();
     await resetDatabase();
@@ -16,7 +16,7 @@ describe('transfer', () => {
 
     expect(await db.tags.count()).toBe(1);
     expect((await db.symptoms.get('s1'))?.name).toBe('A');
-    expect((await db.entries.get('2026-05-27__s1'))?.sliderValue).toBe(50);
+    expect((await db.entries.get('2026-05-27__s1'))?.values.v1).toBe(50);
   });
 
   it('validates payload version', () => {

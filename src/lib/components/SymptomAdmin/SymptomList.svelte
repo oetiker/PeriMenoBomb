@@ -16,7 +16,7 @@
   import { liveQuery } from '$lib/stores/liveQuery.svelte';
   import { snackbar } from '$lib/stores/snackbar.svelte';
   import { pendingRestore } from '$lib/stores/openDialog.svelte';
-  import { db, type Symptom, defaultSymptomInputs } from '$lib/db';
+  import { db, type Symptom, defaultSymptomFields } from '$lib/db';
 
   const treeQ = liveQuery(() => listTree(), [] as TreeNode[]);
   $effect(() => () => treeQ.dispose());
@@ -79,7 +79,7 @@
           icon: r.payload.icon,
           tagIds: r.payload.tagIds,
           parentId: r.payload.parentId,
-          inputs: r.payload.inputs,
+          fields: r.payload.fields,
           daily: r.payload.daily
         },
         isNew: false
@@ -99,7 +99,7 @@
           archived: false,
           createdAt: 0,
           updatedAt: 0,
-          inputs: r.payload.inputs,
+          fields: r.payload.fields,
           daily: r.payload.daily
         } as Symptom,
         isNew: true
@@ -501,7 +501,7 @@
       archived: false,
       createdAt: 0,
       updatedAt: 0,
-      inputs: defaultSymptomInputs(),
+      fields: defaultSymptomFields(),
       daily: false
     };
     editing = { symptom: draft, isNew: true };

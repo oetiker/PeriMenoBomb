@@ -6,6 +6,7 @@ import { snackbar } from '$lib/stores/snackbar.svelte';
 import { resetDatabase, db } from '$lib/db';
 import { createSymptom } from '$lib/db/symptoms';
 import { upsertEntry, deleteEntry } from '$lib/db/entries';
+import { newField } from '$lib/db/fields';
 import { todayKey } from '$lib/utils/date';
 
 describe('EntryList', () => {
@@ -26,8 +27,9 @@ describe('EntryList', () => {
   });
 
   it('snackbar Rückgängig restores a deleted entry', async () => {
-    const sym = await createSymptom({ name: 'X' });
-    await upsertEntry({ date: '2026-05-28', symptomId: sym.id, comment: 'note' });
+    const note = newField('text');
+    const sym = await createSymptom({ name: 'X', fields: [note] });
+    await upsertEntry({ date: '2026-05-28', symptomId: sym.id, values: { [note.id]: 'note' } });
     render(EntryList, { props: { date: '2026-05-28' } });
     await tick();
     // Wait a beat for liveQuery to settle.
@@ -46,9 +48,7 @@ describe('EntryList', () => {
         await upsertEntry({
           date: original.date,
           symptomId: original.symptomId,
-          sliderValue: original.sliderValue,
-          numberValue: original.numberValue,
-          comment: original.comment
+          values: original.values
         });
       }
     });
@@ -56,6 +56,6 @@ describe('EntryList', () => {
     await new Promise((r) => setTimeout(r, 30));
     const restored = await db.entries.get(`2026-05-28__${sym.id}`);
     expect(restored).toBeTruthy();
-    expect(restored?.comment).toBe('note');
+    expect(restored?.values[note.id]).toBe('note');
   });
 });

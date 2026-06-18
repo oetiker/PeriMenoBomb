@@ -1,4 +1,4 @@
-import { db } from '$lib/db';
+import { db, type Symptom } from '$lib/db';
 import { importTemplate } from '$lib/templates/import';
 import { DEFAULT_TEMPLATE } from '$lib/templates/perimeno-default';
 import { upsertEntry } from '$lib/db/entries';
@@ -33,13 +33,23 @@ export async function loadTestData(): Promise<TestDataResult> {
 
   const today = todayKey();
   let entries = 0;
+
+  // Resolve the id of a symptom's first non-deleted field of the given type, so
+  // the seeded value lands under the right field key in the entry's value map.
+  const fieldId = (sym: Symptom | undefined, type: 'slider' | 'number' | 'text'): string | null =>
+    sym?.fields.find((f) => !f.deleted && f.type === type)?.id ?? null;
+
   const put = async (
-    sym: { id: string } | undefined,
+    sym: Symptom | undefined,
     date: string,
-    fields: { sliderValue?: number | null; numberValue?: number | null; comment?: string }
+    spec: { slider?: number | null; number?: number | null; comment?: string }
   ) => {
     if (!sym) return;
-    await upsertEntry({ date, symptomId: sym.id, ...fields });
+    const values: Record<string, number | string | null> = {};
+    if (spec.slider !== undefined) { const id = fieldId(sym, 'slider'); if (id) values[id] = spec.slider; }
+    if (spec.number !== undefined) { const id = fieldId(sym, 'number'); if (id) values[id] = spec.number; }
+    if (spec.comment !== undefined) { const id = fieldId(sym, 'text'); if (id) values[id] = spec.comment; }
+    await upsertEntry({ date, symptomId: sym.id, values });
     entries++;
   };
 
@@ -57,10 +67,10 @@ export async function loadTestData(): Promise<TestDataResult> {
     await put(startMens, start, { comment: 'Beginn' });
     await put(endeMens, addDays(start, 5), { comment: '' });
     // PMS-style headache: rises toward day 0, eases after.
-    await put(kopf, addDays(start, -3), { sliderValue: 35 });
-    await put(kopf, addDays(start, -2), { sliderValue: 60 });
-    await put(kopf, addDays(start, -1), { sliderValue: 85 });
-    await put(kopf, addDays(start, 0), { sliderValue: 50 });
+    await put(kopf, addDays(start, -3), { slider: 35 });
+    await put(kopf, addDays(start, -2), { slider: 60 });
+    await put(kopf, addDays(start, -1), { slider: 85 });
+    await put(kopf, addDays(start, 0), { slider: 50 });
   }
 
   // Daily symptoms: (almost) every day with smooth, phase-shifted waves so the
@@ -69,10 +79,10 @@ export async function loadTestData(): Promise<TestDataResult> {
     const date = addDays(today, -d);
     const wave = (period: number, phase: number, base: number, amp: number) =>
       Math.max(1, Math.min(100, Math.round(base + amp * Math.sin(d / period + phase))));
-    if (d % 7 !== 6) await put(reiz, date, { sliderValue: wave(6, 0, 45, 35) }); // skips ~1 day/week
-    if (d % 9 !== 0) await put(mued, date, { sliderValue: wave(8, 1, 50, 30) });
-    if (d % 6 !== 5) await put(schlaf, date, { sliderValue: wave(5, 2, 55, 25) });
-    if (d % 3 === 0) await put(kaffee, date, { numberValue: 1 + (d % 3) });
+    if (d % 7 !== 6) await put(reiz, date, { slider: wave(6, 0, 45, 35) }); // skips ~1 day/week
+    if (d % 9 !== 0) await put(mued, date, { slider: wave(8, 1, 50, 30) });
+    if (d % 6 !== 5) await put(schlaf, date, { slider: wave(5, 2, 55, 25) });
+    if (d % 3 === 0) await put(kaffee, date, { number: 1 + (d % 3) });
   }
 
   return { symptoms: all.length, entries, cycles: starts.length };

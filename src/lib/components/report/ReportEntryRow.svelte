@@ -1,24 +1,13 @@
 <script lang="ts">
   import Badge from '$lib/components/ui/Badge.svelte';
   import { base } from '$app/paths';
-  import { selectLabelFor } from '$lib/db/entries';
+  import { entryFieldDisplays } from '$lib/db/fields';
   import type { Entry, Symptom } from '$lib/db';
 
   type Props = { entry: Entry; symptom: Symptom; tagNames: string[] };
   let { entry, symptom, tagNames }: Props = $props();
 
-  const sliderText = $derived.by(() => {
-    if (!symptom.inputs.slider.enabled) return '';
-    if (entry.sliderValue === null) return 'unspez';
-    return String(entry.sliderValue);
-  });
-  const numberText = $derived.by(() => {
-    if (!symptom.inputs.number.enabled || entry.numberValue === null) return '';
-    const unit = symptom.inputs.number.unit;
-    return unit ? `${entry.numberValue} ${unit}` : String(entry.numberValue);
-  });
-  const selectText = $derived(selectLabelFor(symptom, entry));
-  const showComment = $derived(symptom.inputs.comment.enabled && entry.comment.trim().length > 0);
+  const displays = $derived(entryFieldDisplays(symptom, entry));
 </script>
 
 <a class="row" href="{base}/day/{entry.date}">
@@ -26,11 +15,10 @@
   <div class="text">
     <div class="name">{symptom.name}</div>
     <div class="meta">
-      {#if sliderText}<span>{sliderText}</span>{/if}
-      {#if numberText}<span>{numberText}</span>{/if}
-      {#if selectText}<span>{selectText}</span>{/if}
-      {#if showComment}<span class="comment">{entry.comment}</span>{/if}
-      {#if !sliderText && !numberText && !selectText && !showComment}<span class="empty">erfasst</span>{/if}
+      {#each displays as d (d.field.id)}
+        <span class:comment={d.field.type === 'text'}>{d.text}</span>
+      {/each}
+      {#if displays.length === 0}<span class="empty">erfasst</span>{/if}
     </div>
     {#if tagNames.length}<div class="tags">{#each tagNames as t}<span class="chip">{t}</span>{/each}</div>{/if}
   </div>

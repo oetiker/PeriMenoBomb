@@ -3,7 +3,7 @@
   import Modal from '$lib/components/ui/Modal.svelte';
   import Badge from '$lib/components/ui/Badge.svelte';
   import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
-  import InputConfigSection from './InputConfigSection.svelte';
+  import FieldListEditor from './FieldListEditor.svelte';
   import SymptomLookModal from './SymptomLookModal.svelte';
   import { emojiName } from '$lib/icons/emoji';
   import {
@@ -14,7 +14,7 @@
     listAllSymptoms
   } from '$lib/db/symptoms';
   import { liveQuery } from '$lib/stores/liveQuery.svelte';
-  import { db, type Symptom, type Tag, defaultSymptomInputs, type SymptomInputs } from '$lib/db';
+  import { db, type Symptom, type Tag, defaultSymptomFields, type MetaField } from '$lib/db';
   import { persistDialog, updateDialogPayload, clearDialog } from '$lib/stores/openDialog.svelte';
   import { page } from '$app/state';
 
@@ -31,7 +31,7 @@
   let icon = $state(untrack(() => symptom.icon));
   let tagIds = $state(untrack(() => [...symptom.tagIds]));
   let parentId = $state<string | null>(untrack(() => symptom.parentId));
-  let inputs = $state<SymptomInputs>(untrack(() => symptom.inputs ?? defaultSymptomInputs()));
+  let fields = $state<MetaField[]>(untrack(() => symptom.fields ?? defaultSymptomFields()));
   let daily = $state(untrack(() => symptom.daily ?? false));
   let duotone = $state(untrack(() => symptom.duotone ?? true));
   let bg = $state(untrack(() => symptom.bg ?? true));
@@ -43,7 +43,7 @@
     icon = symptom.icon;
     tagIds = [...symptom.tagIds];
     parentId = symptom.parentId;
-    inputs = symptom.inputs ?? defaultSymptomInputs();
+    fields = symptom.fields ?? defaultSymptomFields();
     daily = symptom.daily ?? false;
     duotone = symptom.duotone ?? true;
     bg = symptom.bg ?? true;
@@ -62,7 +62,7 @@
         name, color, icon,
         tagIds: $state.snapshot(tagIds),
         parentId,
-        inputs: $state.snapshot(inputs),
+        fields: $state.snapshot(fields),
         daily,
         duotone,
         bg,
@@ -77,7 +77,7 @@
       name, color, icon,
       tagIds: $state.snapshot(tagIds),
       parentId,
-      inputs: $state.snapshot(inputs),
+      fields: $state.snapshot(fields),
       daily,
       duotone,
       bg,
@@ -97,7 +97,7 @@
     const trimmedName = name.trim();
     if (!trimmedName) return;
     const snapTags = $state.snapshot(tagIds);
-    const snapInputs = $state.snapshot(inputs) as SymptomInputs;
+    const snapFields = $state.snapshot(fields) as MetaField[];
     if (isNew) {
       await createSymptom({
         name: trimmedName,
@@ -106,13 +106,13 @@
         color,
         icon,
         tagIds: snapTags,
-        inputs: snapInputs,
+        fields: snapFields,
         daily,
         duotone,
         bg
       });
     } else {
-      await updateSymptom(symptom.id, { name: trimmedName, color, icon, tagIds: snapTags, inputs: snapInputs, daily, duotone, bg });
+      await updateSymptom(symptom.id, { name: trimmedName, color, icon, tagIds: snapTags, fields: snapFields, daily, duotone, bg });
       if (parentId !== symptom.parentId) {
         await moveSymptom(symptom.id, parentId);
       }
@@ -182,10 +182,10 @@
     </div>
 
     {#if !symptom.isFolder}
-      <InputConfigSection
-        {inputs}
+      <FieldListEditor
+        {fields}
         {daily}
-        onInputsChange={(n) => (inputs = n)}
+        onFieldsChange={(n) => (fields = n)}
         onDailyChange={(n) => (daily = n)}
       />
     {/if}

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDatabase } from './index';
 import { createTag, listTags, renameTag, deleteTag, countSymptomsUsingTag } from './tags';
-import { db, type Symptom, defaultSymptomInputs } from './index';
+import { db, type Symptom } from './index';
 
 describe('tags', () => {
   beforeEach(() => resetDatabase());
@@ -34,7 +34,7 @@ describe('tags', () => {
       id: 'sym1', name: 'Reizbarkeit', color: '#ef4444', icon: 'frown',
       tagIds: [t.id], parentId: null, sortIndex: 0, depth: 0,
       isFolder: false, archived: false, createdAt: 1, updatedAt: 1,
-      inputs: defaultSymptomInputs(), daily: false
+      fields: [], daily: false
     };
     await db.symptoms.add(sym);
     await deleteTag(t.id);
@@ -46,8 +46,8 @@ describe('tags', () => {
   it('countSymptomsUsingTag counts only non-archived', async () => {
     const t = await createTag('schlafrelevant');
     await db.symptoms.bulkAdd([
-      { id: 'a', name: 'A', color: '#000', icon: 'moon', tagIds: [t.id], parentId: null, sortIndex: 0, depth: 0, isFolder: false, archived: false, createdAt: 1, updatedAt: 1, inputs: defaultSymptomInputs(), daily: false },
-      { id: 'b', name: 'B', color: '#000', icon: 'moon', tagIds: [t.id], parentId: null, sortIndex: 1, depth: 0, isFolder: false, archived: true,  createdAt: 1, updatedAt: 1, inputs: defaultSymptomInputs(), daily: false }
+      { id: 'a', name: 'A', color: '#000', icon: 'moon', tagIds: [t.id], parentId: null, sortIndex: 0, depth: 0, isFolder: false, archived: false, createdAt: 1, updatedAt: 1, fields: [], daily: false },
+      { id: 'b', name: 'B', color: '#000', icon: 'moon', tagIds: [t.id], parentId: null, sortIndex: 1, depth: 0, isFolder: false, archived: true,  createdAt: 1, updatedAt: 1, fields: [], daily: false }
     ]);
     expect(await countSymptomsUsingTag(t.id)).toBe(1);
   });

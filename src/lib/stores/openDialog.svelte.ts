@@ -1,4 +1,4 @@
-import { db, type SymptomInputs } from '$lib/db';
+import { db, type MetaField } from '$lib/db';
 
 export type OpenDialogState =
   | {
@@ -7,10 +7,7 @@ export type OpenDialogState =
       payload: {
         date: string;
         symptomId: string;
-        sliderValue: number | null;
-        numberValue: number | null;
-        comment: string;
-        selectKey: string | null;
+        values: Record<string, number | string | null>;
       };
     }
   | {
@@ -25,7 +22,7 @@ export type OpenDialogState =
         icon: string;
         tagIds: string[];
         parentId: string | null;
-        inputs: SymptomInputs;
+        fields: MetaField[];
         daily: boolean;
         duotone: boolean;
         bg: boolean;

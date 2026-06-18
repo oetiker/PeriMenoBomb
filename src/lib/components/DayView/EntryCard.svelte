@@ -2,27 +2,15 @@
   import Badge from '$lib/components/ui/Badge.svelte';
   import SwipeRow from '$lib/components/ui/SwipeRow.svelte';
   import { MessageCircle, Flame } from '@lucide/svelte';
-  import { selectLabelFor } from '$lib/db/entries';
+  import { entryFieldDisplays } from '$lib/db/fields';
   import type { Symptom, Entry } from '$lib/db';
 
   type Props = { entry: Entry; symptom: Symptom; streak?: number; onTap: () => void; onSwipe: () => void };
   let { entry, symptom, streak = 1, onTap, onSwipe }: Props = $props();
 
-  const sliderText = $derived.by(() => {
-    if (!symptom.inputs.slider.enabled) return '';
-    if (entry.sliderValue === null) return 'unspezifisch';
-    return String(entry.sliderValue);
-  });
-
-  const numberText = $derived.by(() => {
-    if (!symptom.inputs.number.enabled || entry.numberValue === null) return '';
-    const unit = symptom.inputs.number.unit;
-    return unit ? `${entry.numberValue} ${unit}` : String(entry.numberValue);
-  });
-
-  const selectText = $derived(selectLabelFor(symptom, entry));
-
-  const showComment = $derived(symptom.inputs.comment.enabled && entry.comment.trim().length > 0);
+  const displays = $derived(entryFieldDisplays(symptom, entry));
+  const valueDisplays = $derived(displays.filter((d) => d.field.type !== 'text'));
+  const hasComment = $derived(displays.some((d) => d.field.type === 'text'));
 </script>
 
 <SwipeRow {onSwipe}>
@@ -31,11 +19,9 @@
     <div class="text">
       <div class="name">{symptom.name}</div>
       <div class="meta">
-        {#if sliderText}<span class="slider">{sliderText}</span>{/if}
-        {#if numberText}<span class="number">{numberText}</span>{/if}
-        {#if selectText}<span class="select">{selectText}</span>{/if}
-        {#if showComment}<MessageCircle size={14} />{/if}
-        {#if !sliderText && !numberText && !selectText && !showComment}<span class="empty">erfasst</span>{/if}
+        {#each valueDisplays as d (d.field.id)}<span>{d.text}</span>{/each}
+        {#if hasComment}<MessageCircle size={14} />{/if}
+        {#if valueDisplays.length === 0 && !hasComment}<span class="empty">erfasst</span>{/if}
         {#if streak >= 2}
           <span class="streak" title="{streak} Tage in Folge erfasst"><Flame size={13} />{streak}</span>
         {/if}

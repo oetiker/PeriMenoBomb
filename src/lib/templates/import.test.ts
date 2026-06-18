@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDatabase, db } from '$lib/db';
 import { importTemplate } from './import';
 import { DEFAULT_TEMPLATE } from './perimeno-default';
+import { newField } from '$lib/db/fields';
 
 describe('importTemplate', () => {
   beforeEach(() => resetDatabase());
@@ -30,18 +31,27 @@ describe('importTemplate', () => {
     }
   });
 
-  it('imports inputs and daily from template', async () => {
+  it('imports fields and daily from template', async () => {
+    const textField = newField('text');
     await importTemplate({
       tags: [],
       roots: [
         { name: 'Test', icon: 'circle', color: '#000',
-          inputs: { comment: { enabled: true, required: false } },
+          fields: [textField],
           daily: true }
       ]
     });
     const all = await db.symptoms.toArray();
     expect(all).toHaveLength(1);
     expect(all[0].daily).toBe(true);
-    expect(all[0].inputs.comment.enabled).toBe(true);
+    expect(all[0].fields[0].type).toBe('text');
+  });
+
+  it('imports Hitzewallungen with fields [slider, number, text]', async () => {
+    await importTemplate(DEFAULT_TEMPLATE);
+    const all = await db.symptoms.toArray();
+    const hitze = all.find((s) => s.name === 'Hitzewallungen')!;
+    expect(hitze.fields.map((f) => f.type)).toEqual(['slider', 'number', 'text']);
+    expect(hitze.fields.find((f) => f.type === 'number')!.label).toBe('Schübe');
   });
 });

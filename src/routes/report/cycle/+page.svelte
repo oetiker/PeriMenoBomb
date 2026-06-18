@@ -2,7 +2,8 @@
   import { liveQueryEffect } from '$lib/stores/liveQuery.svelte';
   import { listOccurrenceDates } from '$lib/db/entries';
   import { listAllSymptoms } from '$lib/db/symptoms';
-  import { db, type Entry, type Symptom } from '$lib/db';
+  import { db, type Entry, type Symptom, type MetaField } from '$lib/db';
+  import { isValueField } from '$lib/db/fields';
   import { getMeta, setMeta } from '$lib/db/meta';
   import { addDays, todayKey, daysBetweenKeys } from '$lib/utils/date';
   import { classifyCell, valueDomain, cellColor } from '$lib/report/heatmap';
@@ -24,25 +25,52 @@
     [...symptomsQ.current].sort((a, b) => a.name.localeCompare(b.name, 'de', { sensitivity: 'base' }))
   );
 
+  interface ValueSeries { symptomId: string; field: MetaField; key: string; label: string }
+  const valueSeries = $derived<ValueSeries[]>(
+    symptoms.flatMap((s) => {
+      const vfields = s.fields.filter((f) => !f.deleted && isValueField(f));
+      return vfields.map((f) => ({
+        symptomId: s.id,
+        field: f,
+        key: `${s.id}::${f.id}`,
+        label: vfields.length === 1 ? s.name : `${s.name} [${f.label}]`
+      }));
+    })
+  );
+
   let anchorId = $state<string | null>(null);
-  let valueId = $state<string | null>(null);
+  let valueId = $state<string | null>(null);        // symptomId of the focus series
+  let valueFieldId = $state<string | null>(null);   // field id of the focus series
   let loaded = $state(false);
   $effect(() => {
     if (loaded) return;
     loaded = true;
-    void Promise.all([getMeta<string>('report.cycle.anchorId'), getMeta<string>('report.cycle.valueId')])
-      .then(([a, v]) => { anchorId = a ?? null; valueId = v ?? null; });
+    void Promise.all([
+      getMeta<string>('report.cycle.anchorId'),
+      getMeta<string>('report.cycle.valueId'),
+      getMeta<string>('report.cycle.valueFieldId')
+    ]).then(([a, v, vf]) => { anchorId = a ?? null; valueId = v ?? null; valueFieldId = vf ?? null; });
   });
+  const valueKey = $derived(valueId && valueFieldId ? `${valueId}::${valueFieldId}` : '');
   $effect(() => {
     if (symptoms.length === 0) return;
     if (!anchorId || !symptoms.some((s) => s.id === anchorId)) anchorId = symptoms[0].id;
-    if (!valueId || !symptoms.some((s) => s.id === valueId)) valueId = symptoms[Math.min(1, symptoms.length - 1)].id;
+    if (!valueSeries.some((vs) => vs.key === valueKey)) {
+      const first = valueSeries[0];
+      if (first) { valueId = first.symptomId; valueFieldId = first.field.id; }
+    }
   });
   function onAnchor(e: Event) { anchorId = (e.target as HTMLSelectElement).value; void setMeta('report.cycle.anchorId', anchorId); }
-  function onValue(e: Event) { valueId = (e.target as HTMLSelectElement).value; void setMeta('report.cycle.valueId', valueId); }
+  function onValue(e: Event) {
+    const [sid, fid] = (e.target as HTMLSelectElement).value.split('::');
+    valueId = sid; valueFieldId = fid;
+    void setMeta('report.cycle.valueId', sid);
+    void setMeta('report.cycle.valueFieldId', fid);
+  }
 
   const anchorSym = $derived(symptoms.find((s) => s.id === anchorId) ?? null);
   const valueSym = $derived(symptoms.find((s) => s.id === valueId) ?? null);
+  const valueField = $derived(valueSym?.fields.find((f) => f.id === valueFieldId) ?? null);
 
   // Anchor occurrences = columns (index 0..N-1), ascending in time.
   const anchorDatesQ = liveQueryEffect(
@@ -61,9 +89,9 @@
     () => valueId
   );
   const entriesByDate = $derived(new Map(valueEntriesQ.current.map((e) => [e.date, e])));
-  const numberDomain = $derived(valueSym ? valueDomain(valueEntriesQ.current, valueSym) : null);
+  const numberDomain = $derived(valueField ? valueDomain(valueEntriesQ.current, valueField) : null);
 
-  const hasData = $derived(!!valueSym && N > 0);
+  const hasData = $derived(!!valueField && N > 0);
 
   // ---- view transform (free pan/zoom, NO clamping = infinite surface) ----
   const MIN_SCALE = 0.5, MAX_SCALE = 4;
@@ -131,7 +159,7 @@
           const withinTop = b.top === null || o > b.top;       // above prev start → other cycle
           const withinBot = b.botIsEvent ? o < b.bot : o <= b.bot; // at/after next start → other cycle (today inclusive)
           if (withinTop && withinBot) {
-            const cell = classifyCell(valueSym!, entriesByDate.get(addDays(anchor, o)), numberDomain);
+            const cell = classifyCell(valueField!, entriesByDate.get(addDays(anchor, o)), numberDomain);
             bg = cellColor(cell, valueSym!.color);
           }
         }
@@ -244,8 +272,8 @@
       </select>
     </label>
     <label><span class="cap">Fokus</span>
-      <select onchange={onValue} value={valueId ?? ''} aria-label="Fokus-Symptom wählen">
-        {#each symptoms as s (s.id)}<option value={s.id}>{s.name}</option>{/each}
+      <select onchange={onValue} value={valueKey} aria-label="Fokus-Serie wählen">
+        {#each valueSeries as vs (vs.key)}<option value={vs.key}>{vs.label}</option>{/each}
       </select>
     </label>
   </div>
