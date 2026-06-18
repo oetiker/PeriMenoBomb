@@ -4,6 +4,7 @@ import { tick } from 'svelte';
 import { resetDatabase } from '$lib/db';
 import { createSymptom } from '$lib/db/symptoms';
 import { upsertEntry } from '$lib/db/entries';
+import { newField } from '$lib/db/fields';
 import Page from './+page.svelte';
 
 // Flush liveQueryEffect: wait for Dexie observable to fire, then force a
@@ -19,16 +20,10 @@ describe('Event-List page', () => {
   beforeEach(() => resetDatabase());
 
   it('lists entries grouped by day with the symptom name', async () => {
-    // Create symptom with comment enabled so the comment text is rendered
-    const s = await createSymptom({
-      name: 'Kopfweh',
-      inputs: {
-        slider: { enabled: false, required: false, lowLabel: '', highLabel: '' },
-        number: { enabled: false, required: false, unit: '', integer: true },
-        comment: { enabled: true, required: false }
-      }
-    });
-    await upsertEntry({ date: '2026-05-18', symptomId: s.id, comment: 'morgens' });
+    // Create symptom with a text field so the logged note renders
+    const note = newField('text');
+    const s = await createSymptom({ name: 'Kopfweh', fields: [note] });
+    await upsertEntry({ date: '2026-05-18', symptomId: s.id, values: { [note.id]: 'morgens' } });
     const { rerender } = render(Page);
     await flush(rerender);
     // symptom name appears in both the filter chip and the entry row

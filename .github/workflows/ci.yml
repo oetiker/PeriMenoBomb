@@ -1,0 +1,46 @@
+name: CI
+
+# Validate every pull request the same way the deploy workflow builds main:
+# typecheck, unit tests, production build. Deploy itself stays in deploy.yml
+# and only runs after a merge to main. Triggering on pull_request alone (rather
+# than also on branch pushes) avoids a duplicate run per push on PR branches.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to the same PR cancels the previous in-flight run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BASE_PATH: /PeriMenoBomb
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # corepack provisions pnpm from the `packageManager` field in
+      # package.json; must run before setup-node so `cache: pnpm` finds it.
+      - run: corepack enable
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Paraglide output (src/lib/paraglide/) is gitignored and only produced
+      # by the vite plugin at build/dev time. `pnpm check` and the unit tests
+      # import from it, so compile it explicitly before they run.
+      - run: pnpm exec paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide
+
+      - run: pnpm check
+      - run: pnpm test
+      - run: pnpm build
