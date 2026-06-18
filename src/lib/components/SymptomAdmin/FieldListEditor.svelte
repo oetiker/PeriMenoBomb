@@ -55,7 +55,7 @@
     return { destroy() { rowRefs.delete(id); } };
   }
   let listEl = $state<HTMLElement | null>(null);
-  type DragState = { id: string; rowHeight: number; grabOffsetY: number; currentY: number };
+  type DragState = { id: string; grabOffsetY: number; currentY: number };
   let dragState = $state<DragState | null>(null);
   let activePointerId: number | null = null;
 
@@ -64,7 +64,7 @@
     const li = rowRefs.get(id);
     if (!li) return;
     const rect = li.getBoundingClientRect();
-    dragState = { id, rowHeight: rect.height, grabOffsetY: e.clientY - rect.top, currentY: e.clientY };
+    dragState = { id, grabOffsetY: e.clientY - rect.top, currentY: e.clientY };
     activePointerId = e.pointerId;
     window.addEventListener('pointermove', onDragMove, { passive: false });
     window.addEventListener('pointerup', onDragEnd);
@@ -102,18 +102,28 @@
     const next = [...without.slice(0, clamped), fields[cur], ...without.slice(clamped)];
     if (next.some((f, i) => f.id !== fields[i].id)) onFieldsChange(next);
   }
+  // Lift the grabbed card to follow the cursor. Cards have varying heights and
+  // the list uses a flex `gap`, so the card's resting position can't be derived
+  // from `idx * rowHeight` — read its real layout offset instead. `offsetTop`
+  // is relative to the positioned `.fields` list and, unlike getBoundingClientRect,
+  // is unaffected by the transform we apply here. It reflects the live (possibly
+  // reordered) order because reorderTo runs before this re-renders.
   function dragTransform(id: string): string {
     const ds = dragState;
     if (!ds || ds.id !== id || !listEl) return '';
-    const idx = fields.findIndex((f) => f.id === id);
-    if (idx < 0) return '';
+    const card = rowRefs.get(id);
+    if (!card) return '';
     const listTop = listEl.getBoundingClientRect().top;
-    const naturalTop = listTop + idx * ds.rowHeight;
-    const wantedTop = ds.currentY - ds.grabOffsetY;
+    const naturalTop = card.offsetTop;
+    const wantedTop = ds.currentY - ds.grabOffsetY - listTop;
     return `translateY(${wantedTop - naturalTop}px)`;
   }
-  function draggedIndex(): number {
-    return dragState ? fields.findIndex((f) => f.id === dragState!.id) : -1;
+  // The dashed landing slot sits exactly where the lifted card rests in flow.
+  function placeholderRect(): { top: number; height: number } | null {
+    if (!dragState) return null;
+    const card = rowRefs.get(dragState.id);
+    if (!card) return null;
+    return { top: card.offsetTop, height: card.offsetHeight };
   }
 </script>
 
@@ -173,7 +183,10 @@
       </li>
     {/each}
     {#if dragState}
-      <li class="drop-placeholder" aria-hidden="true" style:top="{draggedIndex() * dragState.rowHeight}px" style:height="{dragState.rowHeight}px"></li>
+      {@const ph = placeholderRect()}
+      {#if ph}
+        <li class="drop-placeholder" aria-hidden="true" style:top="{ph.top}px" style:height="{ph.height}px"></li>
+      {/if}
     {/if}
   </ul>
 
