@@ -119,12 +119,19 @@
     return `translateY(${wantedTop - naturalTop}px)`;
   }
   // The dashed landing slot sits exactly where the lifted card rests in flow.
-  function placeholderRect(): { top: number; height: number } | null {
-    if (!dragState) return null;
+  // This MUST be measured in an effect, not derived during render: effects run
+  // after the DOM is updated, so the dragged card's offsetTop reflects the live
+  // reordered position. The explicit reads of `currentY` and `fields` are the
+  // reactive triggers — without them the slot was computed once at grab time and
+  // then frozen (the placeholder stayed at the original spot while the gap moved).
+  let placeholderGeom = $state<{ top: number; height: number } | null>(null);
+  $effect(() => {
+    if (!dragState) { placeholderGeom = null; return; }
+    void dragState.currentY; // re-measure as the pointer moves
+    void fields;             // re-measure after each live reorder
     const card = rowRefs.get(dragState.id);
-    if (!card) return null;
-    return { top: card.offsetTop, height: card.offsetHeight };
-  }
+    placeholderGeom = card ? { top: card.offsetTop, height: card.offsetHeight } : null;
+  });
 </script>
 
 <section class="config">
@@ -182,11 +189,8 @@
         {/if}
       </li>
     {/each}
-    {#if dragState}
-      {@const ph = placeholderRect()}
-      {#if ph}
-        <li class="drop-placeholder" aria-hidden="true" style:top="{ph.top}px" style:height="{ph.height}px"></li>
-      {/if}
+    {#if dragState && placeholderGeom}
+      <li class="drop-placeholder" aria-hidden="true" style:top="{placeholderGeom.top}px" style:height="{placeholderGeom.height}px"></li>
     {/if}
   </ul>
 
