@@ -1,20 +1,19 @@
 name: CI
 
-# Validate every pull request (and pushes to non-main branches) the same way
-# the deploy workflow builds main: typecheck, unit tests, production build.
-# Deploy itself stays in deploy.yml and only runs after a merge to main.
+# Validate every pull request the same way the deploy workflow builds main:
+# typecheck, unit tests, production build. Deploy itself stays in deploy.yml
+# and only runs after a merge to main. Triggering on pull_request alone (rather
+# than also on branch pushes) avoids a duplicate run per push on PR branches.
 on:
   pull_request:
-  push:
-    branches-ignore: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# A new push to the same ref cancels the previous in-flight run.
+# A new push to the same PR cancels the previous in-flight run.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
