@@ -7,11 +7,14 @@
   import EntryEditor from '$lib/components/EntryEditor/EntryEditor.svelte';
   import Fab from '$lib/components/ui/Fab.svelte';
   import FirstRun from '$lib/components/DayView/FirstRun.svelte';
+  import BackupReminder from '$lib/components/DayView/BackupReminder.svelte';
   import { currentDate } from '$lib/stores/currentDate.svelte';
   import { liveQuery, liveQueryEffect } from '$lib/stores/liveQuery.svelte';
   import { db, type Symptom, type Entry } from '$lib/db';
   import { listEntriesForDate } from '$lib/db/entries';
-  import { getOrDefault } from '$lib/db/meta';
+  import { shouldShowFirstRun } from '$lib/db/meta';
+  import { performBackup, getReminderDays, getLastBackupAt } from '$lib/db/backup';
+  import { isBackupDue, daysSinceBackup } from '$lib/utils/backup';
   import { loadStatusItems, saveStatusItems, type StatusItem } from '$lib/db/statusBar';
   import { pendingRestore } from '$lib/stores/openDialog.svelte';
 
@@ -25,8 +28,24 @@
     | null
   >(null);
 
-  const firstRunQ = liveQuery(async () => await getOrDefault('firstRunCompleted', false), false);
-  $effect(() => () => firstRunQ.dispose());
+  const showWelcomeQ = liveQuery(async () => await shouldShowFirstRun(), false);
+  $effect(() => () => showWelcomeQ.dispose());
+
+  // Backup reminder: due-ness is recomputed whenever the meta table changes
+  // (interval edited, or a backup stamped). `daysSince` feeds the banner text.
+  const backupQ = liveQuery(
+    async () => {
+      const [days, last] = await Promise.all([getReminderDays(), getLastBackupAt()]);
+      const now = Date.now();
+      return { due: isBackupDue(days, last, now), daysSince: daysSinceBackup(last, now) };
+    },
+    { due: false, daysSince: null as number | null }
+  );
+  $effect(() => () => backupQ.dispose());
+  let backupDismissed = $state(false);
+  async function onBackupNow() {
+    await performBackup();
+  }
 
   const entriesQ = liveQueryEffect(
     () => listEntriesForDate(currentDate.value),
@@ -69,9 +88,16 @@
   });
 </script>
 
-{#if !firstRunQ.current}
+{#if showWelcomeQ.current}
   <FirstRun />
 {:else}
+  {#if backupQ.current.due && !backupDismissed}
+    <BackupReminder
+      daysSince={backupQ.current.daysSince}
+      onBackup={onBackupNow}
+      onDismiss={() => (backupDismissed = true)}
+    />
+  {/if}
   <DateHeader />
   <StatusBar
     date={currentDate.value}
