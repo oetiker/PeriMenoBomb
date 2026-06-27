@@ -55,10 +55,23 @@ export async function importAll(payload: ExportPayload, mode: ImportMode): Promi
   });
 }
 
+// gzip needs the Compression Streams API. It's near-universal (Chrome 80+,
+// Firefox 113+, Safari 16.4+) but absent on older engines, so the manual-export
+// path feature-detects and falls back to plain JSON (which readImportFile still
+// reads). Auto-backup is FSA-gated (modern Chromium) so it always has gzip.
+export function isCompressionSupported(): boolean {
+  return typeof CompressionStream !== 'undefined' && typeof DecompressionStream !== 'undefined';
+}
+
 export async function gzipExport(payload: ExportPayload): Promise<Blob> {
   const bytes = await gzip(encodeText(JSON.stringify(payload)));
   // Uint8Array satisfies BlobPart; cast required by the project's strict tsconfig.
   return new Blob([bytes as BlobPart], { type: 'application/gzip' });
+}
+
+// Uncompressed fallback for engines without Compression Streams.
+export function jsonExport(payload: ExportPayload): Blob {
+  return new Blob([JSON.stringify(payload)], { type: 'application/json' });
 }
 
 export function downloadBlob(filename: string, blob: Blob): void {

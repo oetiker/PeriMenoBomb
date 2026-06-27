@@ -10,6 +10,22 @@ describe('backup file names', () => {
     expect(parseBackupDate('perimenobomb-2026-06-27.json.gz.tmp')).toBeNull();
     expect(parseBackupDate('notes.txt')).toBeNull();
   });
+  it('returns null for pattern-matching names with an invalid calendar date', () => {
+    expect(parseBackupDate('perimenobomb-2026-13-45.json.gz')).toBeNull();
+    expect(parseBackupDate('perimenobomb-2026-02-30.json.gz')).toBeNull();
+  });
+});
+
+describe('selectForPruning ignores invalid-date files', () => {
+  it('never deletes a pattern-matching file whose date is not a real calendar date', () => {
+    const { keep, delete: del } = selectForPruning(
+      ['perimenobomb-2026-13-45.json.gz', 'perimenobomb-2000-01-01.json.gz'],
+      '2026-06-27',
+      14
+    );
+    expect(del).toEqual(['perimenobomb-2000-01-01.json.gz']); // real old date still pruned
+    expect(keep).not.toContain('perimenobomb-2026-13-45.json.gz'); // invalid date left alone
+  });
 });
 
 describe('coerceRetentionDays', () => {

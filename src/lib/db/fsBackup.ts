@@ -81,13 +81,26 @@ export async function pickBackupFolder(): Promise<FileSystemDirectoryHandle | nu
   }
 }
 
-export function queryBackupAccess(h: FileSystemDirectoryHandle): Promise<PermissionState> {
-  return (h as WithPerms).queryPermission({ mode: 'readwrite' });
+// queryPermission can reject on a stale/invalid handle in some engines; never
+// throw — a failure to determine access is treated as 'denied' so the callers
+// (runAutoBackup, autoBackupHealth) stay silent and best-effort.
+export async function queryBackupAccess(h: FileSystemDirectoryHandle): Promise<PermissionState> {
+  try {
+    return await (h as WithPerms).queryPermission({ mode: 'readwrite' });
+  } catch {
+    return 'denied';
+  }
 }
 
 export async function requestBackupAccess(h: FileSystemDirectoryHandle): Promise<boolean> {
-  // Must be called from a user gesture.
-  return (await (h as WithPerms).requestPermission({ mode: 'readwrite' })) === 'granted';
+  // Must be called from a user gesture. requestPermission can reject (e.g. not a
+  // gesture, or handle revoked); swallow it and report "not granted" so a click
+  // handler reports cleanly instead of aborting on an unhandled rejection.
+  try {
+    return (await (h as WithPerms).requestPermission({ mode: 'readwrite' })) === 'granted';
+  } catch {
+    return false;
+  }
 }
 
 // Atomic: write a temp file, then move() it onto the final name only after a
@@ -152,20 +165,23 @@ export async function runAutoBackup(
   withGesture = false
 ): Promise<'skipped' | 'ok' | 'unhealthy' | 'error'> {
   if (!isAutoBackupSupported()) return 'skipped';
-  if (!(await isAutoBackupEnabled())) return 'skipped';
-  const dir = await getBackupDirHandle();
-  if (!dir) return 'unhealthy';
-
-  let access = await queryBackupAccess(dir);
-  if (access !== 'granted' && withGesture) {
-    access = (await requestBackupAccess(dir)) ? 'granted' : access;
-  }
-  if (access !== 'granted') {
-    await recordAutoBackupError('permission');
-    return 'unhealthy';
-  }
-
+  // Whole body in try/catch: every await below (config reads, permission API,
+  // export, write, prune, status writes) can theoretically reject; "best-effort"
+  // means none of that escapes to the `void runAutoBackup()` callers.
   try {
+    if (!(await isAutoBackupEnabled())) return 'skipped';
+    const dir = await getBackupDirHandle();
+    if (!dir) return 'unhealthy';
+
+    let access = await queryBackupAccess(dir);
+    if (access !== 'granted' && withGesture) {
+      access = (await requestBackupAccess(dir)) ? 'granted' : access;
+    }
+    if (access !== 'granted') {
+      await recordAutoBackupError('permission');
+      return 'unhealthy';
+    }
+
     const payload = await exportAll();
     const bytes = await gzip(encodeText(JSON.stringify(payload)));
     const day = todayKey();
@@ -175,7 +191,7 @@ export async function runAutoBackup(
     await recordBackupTime(now); // keep the reminder clock consistent
     return 'ok';
   } catch (err) {
-    await recordAutoBackupError((err as Error)?.message ?? 'write failed');
+    await recordAutoBackupError((err as Error)?.message ?? 'write failed').catch(() => undefined);
     return 'error';
   }
 }
@@ -185,14 +201,24 @@ export async function autoBackupHealth(): Promise<{
   healthy: boolean;
   reason?: string;
 }> {
-  const enabled = isAutoBackupSupported() && (await isAutoBackupEnabled());
-  if (!enabled) return { enabled: false, healthy: false };
-  const dir = await getBackupDirHandle();
-  if (!dir) return { enabled: true, healthy: false, reason: 'no-folder' };
-  if ((await queryBackupAccess(dir)) !== 'granted') {
-    return { enabled: true, healthy: false, reason: 'permission' };
+  try {
+    const enabled = isAutoBackupSupported() && (await isAutoBackupEnabled());
+    if (!enabled) return { enabled: false, healthy: false };
+    const dir = await getBackupDirHandle();
+    if (!dir) return { enabled: true, healthy: false, reason: 'no-folder' };
+    if ((await queryBackupAccess(dir)) !== 'granted') {
+      return { enabled: true, healthy: false, reason: 'permission' };
+    }
+    const { lastError, lastSuccess } = await getAutoBackupStatus();
+    if (lastError) return { enabled: true, healthy: false, reason: lastError };
+    // Configured correctly but no backup has actually been written yet: not a
+    // failure ('no-backup-yet'), but not healthy either — the caller keeps the
+    // ordinary backup reminder visible until a real backup succeeds.
+    if (lastSuccess === undefined) return { enabled: true, healthy: false, reason: 'no-backup-yet' };
+    return { enabled: true, healthy: true };
+  } catch {
+    // Best-effort: on an unexpected error, report not-enabled so the day view
+    // falls back to the ordinary interval reminder rather than crashing.
+    return { enabled: false, healthy: false };
   }
-  const { lastError } = await getAutoBackupStatus();
-  if (lastError) return { enabled: true, healthy: false, reason: lastError };
-  return { enabled: true, healthy: true };
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDatabase, db } from '$lib/db';
-import { exportAll, importAll, validateExportPayload, gzipExport, readImportFile } from './transfer';
+import { exportAll, importAll, validateExportPayload, gzipExport, jsonExport, readImportFile } from './transfer';
 import { isGzip } from '$lib/utils/gzip';
 
 describe('transfer', () => {
@@ -47,6 +47,17 @@ describe('transfer', () => {
     const file = new File(['{"version":1,"symptoms":[],"tags":[],"entries":[],"meta":[]}'], 'b.json');
     const parsed = await readImportFile(file) as { version: number };
     expect(parsed.version).toBe(1);
+  });
+
+  it('jsonExport (gzip-less fallback) round-trips through readImportFile', async () => {
+    await db.tags.add({ id: 't1', name: 'x', createdAt: 1 });
+    const payload = await exportAll();
+    const blob = jsonExport(payload);
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    expect(isGzip(bytes)).toBe(false); // plain JSON, not gzip
+    const file = new File([blob], 'b.json');
+    const parsed = await readImportFile(file) as { tags: unknown[] };
+    expect(parsed.tags).toHaveLength(1);
   });
 
   it('imports a legacy (pre-v6) backup as readable fields/values', async () => {

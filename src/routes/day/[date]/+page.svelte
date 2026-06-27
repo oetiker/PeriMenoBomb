@@ -39,8 +39,11 @@
       const health = await autoBackupHealth();
       // Auto-backup on and healthy → no reminder at all.
       if (health.enabled && health.healthy) return { due: false, broken: false, daysSince: null as number | null };
-      // Auto-backup on but broken → show the "interrupted" warning regardless of interval.
-      if (health.enabled && !health.healthy) return { due: true, broken: true, daysSince: null as number | null };
+      // Auto-backup on but actually broken (no folder / permission / write error) →
+      // show the "interrupted" warning regardless of interval. 'no-backup-yet' is
+      // not broken: fall through to the ordinary reminder until the first backup runs.
+      if (health.enabled && !health.healthy && health.reason !== 'no-backup-yet')
+        return { due: true, broken: true, daysSince: null as number | null };
       const [days, last] = await Promise.all([getReminderDays(), getLastBackupAt()]);
       const now = Date.now();
       return { due: isBackupDue(days, last, now), broken: false, daysSince: daysSinceBackup(last, now) };

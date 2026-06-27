@@ -1,5 +1,5 @@
 import { getMeta, setMeta } from './meta';
-import { exportAll, gzipExport, downloadBlob } from '$lib/utils/transfer';
+import { exportAll, gzipExport, jsonExport, downloadBlob, isCompressionSupported } from '$lib/utils/transfer';
 import { backupFileName } from '$lib/utils/backupRotation';
 import { todayKey } from '$lib/utils/date';
 import { coerceReminderDays } from '$lib/utils/backup';
@@ -30,12 +30,17 @@ export async function recordBackupTime(now: number): Promise<void> {
   await setMeta(LAST_BACKUP_KEY, now);
 }
 
-// Export all data to a JSON download and stamp the backup time. Shared by the
-// Settings export button and the day-view reminder banner so both record the
-// backup identically.
+// Export all data to a downloaded backup file and stamp the backup time. Shared
+// by the Settings export button and the day-view reminder banner so both record
+// the backup identically. Produces a gzip .json.gz where Compression Streams are
+// available, otherwise a plain .json (import auto-detects either by content).
 export async function performBackup(now: number = Date.now()): Promise<void> {
   const payload = await exportAll();
-  const blob = await gzipExport(payload);
-  downloadBlob(backupFileName(todayKey()), blob);
+  const day = todayKey();
+  if (isCompressionSupported()) {
+    downloadBlob(backupFileName(day), await gzipExport(payload));
+  } else {
+    downloadBlob(`perimenobomb-${day}.json`, jsonExport(payload));
+  }
   await recordBackupTime(now);
 }

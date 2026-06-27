@@ -27,8 +27,12 @@
   let wipeStep = $state<0 | 1 | 2>(0);
 
   async function onExport() {
-    await performBackup();
-    snackbar.show({ message: 'Backup erstellt.' });
+    try {
+      await performBackup();
+      snackbar.show({ message: 'Backup erstellt.' });
+    } catch {
+      snackbar.show({ message: 'Backup konnte nicht erstellt werden.' });
+    }
   }
 
   // Backup-reminder interval (days; 0 = off). Edited locally, persisted on
@@ -223,8 +227,8 @@
 
 <section>
   <h2>Backup &amp; Übertragung</h2>
-  <p>Alle Daten als JSON-Datei herunterladen (oder zurückspielen).</p>
-  <button type="button" onclick={onExport}>Daten exportieren (JSON)</button>
+  <p>Alle Daten als Backup-Datei herunterladen (oder zurückspielen).</p>
+  <button type="button" onclick={onExport}>Daten exportieren</button>
   <button type="button" onclick={() => fileInput.click()}>Daten importieren…</button>
   <input bind:this={fileInput} type="file" accept="application/json,application/gzip,.json,.gz,.json.gz" hidden onchange={onFile} />
 

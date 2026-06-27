@@ -9,7 +9,14 @@ export function backupFileName(dateKey: string): string {
 
 export function parseBackupDate(name: string): string | null {
   const m = NAME_RE.exec(name);
-  return m ? m[1] : null;
+  if (!m) return null;
+  const key = m[1];
+  // The regex enforces digit structure but not calendar validity. Reject dates
+  // that don't round-trip (e.g. 2026-13-45, 2026-02-30) so a foreign file that
+  // merely fits the pattern is never selected for pruning (no accidental delete).
+  const d = new Date(`${key}T00:00:00Z`);
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== key) return null;
+  return key;
 }
 
 export function coerceRetentionDays(value: unknown): number {
