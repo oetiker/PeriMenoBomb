@@ -5,8 +5,13 @@
     value: string | null;
     options: SelectOption[];
     onChange: (key: string | null) => void;
+    /** The field's section label; shown as the prompt option when defined so the
+        collapsed select is self-describing. Falls back to a generic prompt. */
+    label?: string;
   };
-  let { value, options, onChange }: Props = $props();
+  let { value, options, onChange, label }: Props = $props();
+
+  const promptText = $derived(label?.trim() ? `— ${label} —` : '— bitte wählen —');
 
   // Live choices: active (non-deleted) options.
   const active = $derived(options.filter((o) => !o.deleted));
@@ -24,7 +29,7 @@
 
 <div class="select-input">
   <select value={value ?? ''} oninput={onInput} aria-label="Auswahl">
-    <option value="">— keine Auswahl —</option>
+    <option value="">{promptText}</option>
     {#each active as o (o.key)}
       <option value={o.key}>{o.label || '(ohne Name)'}</option>
     {/each}

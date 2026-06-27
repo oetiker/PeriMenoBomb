@@ -36,24 +36,37 @@
       localColor = color;
       localDuotone = duotone;
       localBg = bg;
-      custom = '';
     });
   });
 
-  let custom = $state('');
+  // The custom-emoji "+" tile overlays a transparent input. Tapping the tile
+  // focuses it natively, which opens the on-screen keyboard; once a full emoji
+  // grapheme lands we adopt it and blur to dismiss the keyboard again. Anything
+  // non-emoji is left in place so multi-keystroke / IME composition can finish.
+  // Last user-perceived character of `v`. Prefer Intl.Segmenter (correctly keeps
+  // ZWJ sequences, skin-tone modifiers and flags as one grapheme); fall back to
+  // the last code point where Segmenter is missing (e.g. iOS Safari < 14.5),
+  // which approximates compound emoji but keeps the picker working.
+  function lastGrapheme(v: string): string {
+    if (typeof Intl !== 'undefined' && 'Segmenter' in Intl) {
+      const parts = Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(v));
+      return parts[parts.length - 1]?.segment ?? '';
+    }
+    const cps = Array.from(v);
+    return cps[cps.length - 1] ?? '';
+  }
 
   function onCustomInput(e: Event) {
     const el = e.target as HTMLInputElement;
     const v = el.value;
     if (!v) return;
-    const parts = Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(v));
-    const last = parts[parts.length - 1]?.segment ?? '';
+    const last = lastGrapheme(v);
     if (looksLikeEmoji(last)) {
       localIcon = last;
-      custom = '';
       el.value = '';
-    } else {
-      custom = v;
+      // Defer the blur a frame: dismissing the keyboard synchronously inside the
+      // same input event can be dropped/raced on iOS Safari.
+      requestAnimationFrame(() => el.blur());
     }
   }
 
@@ -68,17 +81,6 @@
     <Badge icon={localIcon} color={localColor} duotone={localDuotone} bg={localBg} size={36} />
     {#if name}<strong>{name}</strong>{/if}
   </div>
-
-  <input
-    class="custom"
-    type="text"
-    bind:value={custom}
-    oninput={onCustomInput}
-    placeholder="Eigenes Emoji eintippen / einfügen…"
-    autocapitalize="off"
-    autocomplete="off"
-    inputmode="text"
-  />
 
   <div class="field">
     <span class="label">Farbe</span>
@@ -107,6 +109,19 @@
 
   <div class="section-label">Vorschläge</div>
   <div class="grid" role="grid">
+    <div class="add-emoji">
+      <span class="plus" aria-hidden="true">+</span>
+      <input
+        class="add-input"
+        type="text"
+        oninput={onCustomInput}
+        placeholder="Eigenes Emoji eintippen / einfügen…"
+        aria-label="Eigenes Emoji eintippen"
+        autocapitalize="off"
+        autocomplete="off"
+        inputmode="text"
+      />
+    </div>
     {#each SUGGESTED_EMOJIS as e}
       <button
         type="button"
@@ -116,7 +131,7 @@
         aria-label={e.name}
         title={e.name}
       >
-        <Badge icon={e.glyph} color={localColor} duotone={localDuotone} bg={localBg} size={28} />
+        <Badge icon={e.glyph} color={localColor} duotone={localDuotone} bg={localBg} size={36} />
       </button>
     {/each}
   </div>
@@ -130,30 +145,51 @@
 <style>
   .preview { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); }
   .section-label { font-size: var(--fs-xs); color: var(--c-text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin: var(--sp-3) 0 var(--sp-2); }
+  /* Shares its track size + gap with ColorPicker's compact grid so the colour
+     swatches and emoji badges line up as one consistent grid of 36px circles. */
   .grid {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    row-gap: var(--sp-3);
-    column-gap: 2px;
+    grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+    gap: var(--sp-2);
+    justify-items: center;
+    align-items: center;
   }
   .tile {
-    aspect-ratio: 1;
+    width: 44px; height: 44px;
     display: flex; align-items: center; justify-content: center;
     border: 0; background: none;
-    border-radius: var(--r-2);
+    border-radius: 50%;
     cursor: pointer;
     padding: 0;
   }
   .tile.selected { background: color-mix(in srgb, var(--c-text) 12%, transparent); }
-  .custom {
-    padding: var(--sp-3);
-    border: 1px solid var(--c-border);
-    border-radius: var(--r-2);
-    font-size: var(--fs-md);
-    margin-bottom: var(--sp-4);
-    width: 100%;
-    box-sizing: border-box;
+  /* Custom-emoji entry: a dashed "+" circle the same 36px size as the colour
+     swatches and emoji badges, with a transparent input laid over it so a tap
+     focuses the field natively and brings up the keyboard. */
+  .add-emoji {
+    position: relative;
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px dashed var(--c-border-strong);
+    border-radius: 50%;
+    color: var(--c-text-dim);
+    font-size: var(--fs-lg);
   }
+  .add-input {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    margin: 0; padding: 0; border: 0;
+    background: transparent;
+    color: transparent;
+    text-align: center;
+    cursor: pointer;
+    /* Hide the caret/typed text — the picked emoji shows in the preview, and the
+       field self-clears after each grapheme. */
+    caret-color: transparent;
+  }
+  .add-input::placeholder { color: transparent; }
+  .add-input:focus { outline: 2px solid var(--c-primary); outline-offset: -2px; border-radius: 50%; }
   .field { display: flex; flex-direction: column; gap: var(--sp-2); margin-bottom: var(--sp-4); }
   .label { font-size: var(--fs-xs); color: var(--c-text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
   .toggle-row { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); cursor: pointer; }
