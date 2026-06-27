@@ -5,7 +5,7 @@ import { coerceRetentionDays, autoBackupFileName, selectForPruning } from '$lib/
 import { gzip, encodeText } from '$lib/utils/gzip';
 import { exportAll } from '$lib/utils/transfer';
 import { recordBackupTime } from './backup';
-import { todayKey, toTimeKey } from '$lib/utils/date';
+import { toDateKey, toTimeKey } from '$lib/utils/date';
 
 const DIR_HANDLE_KEY = 'autoBackupDirHandle';
 const ENABLED_KEY = 'autoBackupEnabled';
@@ -147,14 +147,24 @@ export async function pruneBackups(
   return del;
 }
 
-// Write today's backup file (overwriting) and prune. Silent and best-effort:
-// never throws into the caller; failures are recorded for the Settings status.
+// Guards against overlapping runs. runAutoBackup is fired from several places
+// (app startup, Settings setup, and Dexie change triggers), so two invocations
+// can otherwise race onto the same per-second filename — a concurrent
+// createWritable() on the same file rejects with a lock error, surfacing a
+// spurious "backup failed". A single in-flight run is enough; a skipped trigger
+// is harmless because the next change reschedules another.
+let inFlight = false;
+
+// Write a new timestamped backup file and prune. Silent and best-effort: never
+// throws into the caller; failures are recorded for the Settings status.
 // `withGesture` allows requesting permission (only true when called from a tap).
 export async function runAutoBackup(
   now: number = Date.now(),
   withGesture = false
 ): Promise<'skipped' | 'ok' | 'unhealthy' | 'error'> {
   if (!isAutoBackupSupported()) return 'skipped';
+  if (inFlight) return 'skipped';
+  inFlight = true;
   // Whole body in try/catch: every await below (config reads, permission API,
   // export, write, prune, status writes) can theoretically reject; "best-effort"
   // means none of that escapes to the `void runAutoBackup()` callers.
@@ -174,8 +184,12 @@ export async function runAutoBackup(
 
     const payload = await exportAll();
     const bytes = await gzip(encodeText(JSON.stringify(payload)));
-    const day = todayKey();
-    await writeBackupFile(dir, bytes, day, toTimeKey(new Date(now)));
+    // Derive day and time from one instant so a run that crosses local midnight
+    // can never label a new-day file with the previous day's time (which would
+    // sort as "newest" and prune the day's real later backups).
+    const stamp = new Date(now);
+    const day = toDateKey(stamp);
+    await writeBackupFile(dir, bytes, day, toTimeKey(stamp));
     await pruneBackups(dir, await getRetentionDays(), day);
     await recordAutoBackupSuccess(now);
     await recordBackupTime(now); // keep the reminder clock consistent
@@ -183,6 +197,8 @@ export async function runAutoBackup(
   } catch (err) {
     await recordAutoBackupError((err as Error)?.message ?? 'write failed').catch(() => undefined);
     return 'error';
+  } finally {
+    inFlight = false;
   }
 }
 
