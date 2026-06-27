@@ -43,16 +43,30 @@
   // focuses it natively, which opens the on-screen keyboard; once a full emoji
   // grapheme lands we adopt it and blur to dismiss the keyboard again. Anything
   // non-emoji is left in place so multi-keystroke / IME composition can finish.
+  // Last user-perceived character of `v`. Prefer Intl.Segmenter (correctly keeps
+  // ZWJ sequences, skin-tone modifiers and flags as one grapheme); fall back to
+  // the last code point where Segmenter is missing (e.g. iOS Safari < 14.5),
+  // which approximates compound emoji but keeps the picker working.
+  function lastGrapheme(v: string): string {
+    if (typeof Intl !== 'undefined' && 'Segmenter' in Intl) {
+      const parts = Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(v));
+      return parts[parts.length - 1]?.segment ?? '';
+    }
+    const cps = Array.from(v);
+    return cps[cps.length - 1] ?? '';
+  }
+
   function onCustomInput(e: Event) {
     const el = e.target as HTMLInputElement;
     const v = el.value;
     if (!v) return;
-    const parts = Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(v));
-    const last = parts[parts.length - 1]?.segment ?? '';
+    const last = lastGrapheme(v);
     if (looksLikeEmoji(last)) {
       localIcon = last;
       el.value = '';
-      el.blur();
+      // Defer the blur a frame: dismissing the keyboard synchronously inside the
+      // same input event can be dropped/raced on iOS Safari.
+      requestAnimationFrame(() => el.blur());
     }
   }
 

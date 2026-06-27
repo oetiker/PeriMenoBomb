@@ -25,7 +25,9 @@ describe('ColorPicker', () => {
     expect(container.querySelector('[data-color="#3b82f6"]')).not.toBeNull();
     expect(container.querySelector('.hsv')).toBeNull();
 
-    await fireEvent.click(container.querySelector('.swatch.more') as HTMLElement);
+    const more = container.querySelector('.swatch.more');
+    expect(more).not.toBeNull();
+    await fireEvent.click(more as HTMLElement);
 
     expect(container.querySelector('.hsv')).not.toBeNull();
   });
