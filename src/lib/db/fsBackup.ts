@@ -1,7 +1,7 @@
 // src/lib/db/fsBackup.ts
 import { db } from './index';
 import { getMeta, setMeta } from './meta';
-import { coerceRetentionDays } from '$lib/utils/backupRotation';
+import { coerceRetentionDays, backupFileName, selectForPruning } from '$lib/utils/backupRotation';
 
 const DIR_HANDLE_KEY = 'autoBackupDirHandle';
 const ENABLED_KEY = 'autoBackupEnabled';
@@ -55,4 +55,87 @@ export async function recordAutoBackupSuccess(now: number): Promise<void> {
 }
 export async function recordAutoBackupError(message: string): Promise<void> {
   await setMeta(LAST_ERROR_KEY, message);
+}
+
+// The handle's permission methods are not yet in the TS DOM lib; declare the
+// minimum we use.
+type Perm = { mode: 'read' | 'readwrite' };
+type WithPerms = FileSystemDirectoryHandle & {
+  queryPermission(p: Perm): Promise<PermissionState>;
+  requestPermission(p: Perm): Promise<PermissionState>;
+};
+
+export async function pickBackupFolder(): Promise<FileSystemDirectoryHandle | null> {
+  // Must be called from a user gesture (a click handler).
+  const picker = (window as unknown as {
+    showDirectoryPicker(opts?: { mode?: 'read' | 'readwrite' }): Promise<FileSystemDirectoryHandle>;
+  }).showDirectoryPicker;
+  try {
+    return await picker({ mode: 'readwrite' });
+  } catch {
+    return null; // user cancelled
+  }
+}
+
+export function queryBackupAccess(h: FileSystemDirectoryHandle): Promise<PermissionState> {
+  return (h as WithPerms).queryPermission({ mode: 'readwrite' });
+}
+
+export async function requestBackupAccess(h: FileSystemDirectoryHandle): Promise<boolean> {
+  // Must be called from a user gesture.
+  return (await (h as WithPerms).requestPermission({ mode: 'readwrite' })) === 'granted';
+}
+
+// Atomic: write a temp file, then move() it onto the final name only after a
+// clean close, so an interrupted write never clobbers the last good backup.
+export async function writeBackupFile(
+  dir: FileSystemDirectoryHandle,
+  bytes: Uint8Array,
+  dateKey: string
+): Promise<void> {
+  const finalName = backupFileName(dateKey);
+  const tmpName = `${finalName}.tmp`;
+  const tmp = await dir.getFileHandle(tmpName, { create: true });
+  const w = await tmp.createWritable();
+  // BlobPart cast mirrors gzip.ts pattern — Uint8Array<ArrayBufferLike> vs strict DOM.
+  // On write failure (e.g. disk full) abort() releases the file lock and discards
+  // the partial temp, so a leaked writable never blocks the next backup run.
+  try {
+    await w.write(new Blob([bytes as BlobPart]));
+    await w.close();
+  } catch (err) {
+    await w.abort().catch(() => undefined);
+    throw err;
+  }
+  const movable = tmp as FileSystemFileHandle & { move?(name: string): Promise<void> };
+  if (typeof movable.move === 'function') {
+    await movable.move(finalName); // replaces an existing same-day file
+  } else {
+    // Fallback for engines without move(): copy then drop the temp.
+    const out = await dir.getFileHandle(finalName, { create: true });
+    const ow = await out.createWritable();
+    try {
+      await ow.write(new Blob([bytes as BlobPart]));
+      await ow.close();
+    } catch (err) {
+      await ow.abort().catch(() => undefined);
+      throw err; // leave the temp in place; do not remove on a failed copy
+    }
+    await dir.removeEntry(tmpName);
+  }
+}
+
+export async function pruneBackups(
+  dir: FileSystemDirectoryHandle,
+  retentionDays: number,
+  today: string
+): Promise<string[]> {
+  const names: string[] = [];
+  // AsyncIterable keys(); not yet in the TS DOM lib.
+  for await (const name of (dir as unknown as { keys(): AsyncIterable<string> }).keys()) {
+    names.push(name);
+  }
+  const { delete: del } = selectForPruning(names, today, retentionDays);
+  for (const name of del) await dir.removeEntry(name);
+  return del;
 }
