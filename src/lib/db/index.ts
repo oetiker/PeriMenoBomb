@@ -95,6 +95,30 @@ export interface MetaRow {
   value: unknown;
 }
 
+// The store/index definition is identical across every version — only the
+// upgrade hooks differ — so it lives here once.
+export const STORES = {
+  symptoms: 'id, parentId, [parentId+sortIndex], archived',
+  tags:     'id, name',
+  entries:  'id, date, symptomId, [date+symptomId]',
+  meta:     'key'
+} as const;
+
+export const CURRENT_DB_VERSION = 6;
+
+/** Declare the full versioned schema + upgrade chain on a Dexie instance.
+    Shared by the live PeriMenoDB and by the throwaway database used to replay
+    an old backup through the real migrations on import (see importMigrate.ts),
+    so the migrations are the single source of truth for both paths. */
+export function defineSchema(db: Dexie): void {
+  db.version(1).stores(STORES);
+  db.version(2).stores(STORES).upgrade(upgradeV1toV2);
+  db.version(3).stores(STORES).upgrade(upgradeV2toV3);
+  db.version(4).stores(STORES).upgrade(upgradeV3toV4);
+  db.version(5).stores(STORES).upgrade(upgradeV4toV5);
+  db.version(6).stores(STORES).upgrade(upgradeV5toV6);
+}
+
 export class PeriMenoDB extends Dexie {
   symptoms!: Table<Symptom, string>;
   tags!: Table<Tag, string>;
@@ -103,42 +127,7 @@ export class PeriMenoDB extends Dexie {
 
   constructor() {
     super('perimenobomb');
-    this.version(1).stores({
-      symptoms: 'id, parentId, [parentId+sortIndex], archived',
-      tags: 'id, name',
-      entries: 'id, date, symptomId, [date+symptomId]',
-      meta: 'key'
-    });
-    this.version(2).stores({
-      symptoms: 'id, parentId, [parentId+sortIndex], archived',
-      tags:     'id, name',
-      entries:  'id, date, symptomId, [date+symptomId]',
-      meta:     'key'
-    }).upgrade(upgradeV1toV2);
-    this.version(3).stores({
-      symptoms: 'id, parentId, [parentId+sortIndex], archived',
-      tags:     'id, name',
-      entries:  'id, date, symptomId, [date+symptomId]',
-      meta:     'key'
-    }).upgrade(upgradeV2toV3);
-    this.version(4).stores({
-      symptoms: 'id, parentId, [parentId+sortIndex], archived',
-      tags:     'id, name',
-      entries:  'id, date, symptomId, [date+symptomId]',
-      meta:     'key'
-    }).upgrade(upgradeV3toV4);
-    this.version(5).stores({
-      symptoms: 'id, parentId, [parentId+sortIndex], archived',
-      tags:     'id, name',
-      entries:  'id, date, symptomId, [date+symptomId]',
-      meta:     'key'
-    }).upgrade(upgradeV4toV5);
-    this.version(6).stores({
-      symptoms: 'id, parentId, [parentId+sortIndex], archived',
-      tags:     'id, name',
-      entries:  'id, date, symptomId, [date+symptomId]',
-      meta:     'key'
-    }).upgrade(upgradeV5toV6);
+    defineSchema(this);
   }
 }
 

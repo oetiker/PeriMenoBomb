@@ -1,7 +1,10 @@
 <script lang="ts">
   import { base } from '$app/paths';
-  import { todayKey } from '$lib/utils/date';
-  import { exportAll, importAll, downloadJson, readFileAsText, validateExportPayload, type ExportPayload } from '$lib/utils/transfer';
+  import { onMount } from 'svelte';
+  import { importAll, readFileAsText, validateExportPayload, type ExportPayload } from '$lib/utils/transfer';
+  import { performBackup, getReminderDays, setReminderDays, getLastBackupAt } from '$lib/db/backup';
+  import { daysSinceBackup } from '$lib/utils/backup';
+  import { liveQuery } from '$lib/stores/liveQuery.svelte';
   import { importTemplate } from '$lib/templates/import';
   import { DEFAULT_TEMPLATE } from '$lib/templates/perimeno-default';
   import { loadTestData } from '$lib/dev/testdata';
@@ -19,9 +22,26 @@
   let wipeStep = $state<0 | 1 | 2>(0);
 
   async function onExport() {
-    const p = await exportAll();
-    downloadJson(`perimenobomb-export-${todayKey()}.json`, p);
+    await performBackup();
+    snackbar.show({ message: 'Backup erstellt.' });
   }
+
+  // Backup-reminder interval (days; 0 = off). Edited locally, persisted on
+  // change; re-read so the field reflects any coercion (clamp/floor).
+  let reminderDays = $state(14);
+  onMount(async () => { reminderDays = await getReminderDays(); });
+  async function onReminderDaysChange(e: Event) {
+    const raw = (e.currentTarget as HTMLInputElement).value;
+    await setReminderDays(raw === '' ? 0 : Number(raw));
+    reminderDays = await getReminderDays();
+  }
+
+  // Read-only "last backup" status; reactive so it updates right after export.
+  const lastBackupQ = liveQuery(
+    async () => daysSinceBackup(await getLastBackupAt(), Date.now()),
+    null as number | null
+  );
+  $effect(() => () => lastBackupQ.dispose());
 
   let fileInput: HTMLInputElement;
 
@@ -45,7 +65,9 @@
     const s = importState;
     importState = null;
     if (!s) return;
-    await importAll(s.payload, mode);
+    // `s.payload` is a Svelte $state proxy (importState is reactive); IndexedDB's
+    // structured clone can't serialize a proxy, so snapshot to plain objects first.
+    await importAll($state.snapshot(s.payload), mode);
     snackbar.show({ message: 'Import abgeschlossen.' });
   }
 
@@ -151,6 +173,27 @@
   <button type="button" onclick={onExport}>Daten exportieren (JSON)</button>
   <button type="button" onclick={() => fileInput.click()}>Daten importieren…</button>
   <input bind:this={fileInput} type="file" accept="application/json,.json" hidden onchange={onFile} />
+
+  <label class="field reminder-field">
+    <span>Backup-Erinnerung alle … Tagen (0 = aus)</span>
+    <input
+      type="number"
+      min="0"
+      max="365"
+      inputmode="numeric"
+      value={reminderDays}
+      onchange={onReminderDaysChange}
+    />
+  </label>
+  <p class="last-backup">
+    {#if lastBackupQ.current === null}
+      Noch kein Backup erstellt.
+    {:else if lastBackupQ.current === 0}
+      Letztes Backup: heute.
+    {:else}
+      Letztes Backup: vor {lastBackupQ.current} {lastBackupQ.current === 1 ? 'Tag' : 'Tagen'}.
+    {/if}
+  </p>
 </section>
 
 <section>
@@ -241,6 +284,18 @@
     color: var(--c-text);
     font: inherit;
   }
+
+  .reminder-field { margin-top: var(--sp-3); }
+  .reminder-field input {
+    width: 5rem;
+    padding: var(--sp-2) var(--sp-3);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-2);
+    background: var(--c-surface);
+    color: var(--c-text);
+    font: inherit;
+  }
+  .last-backup { margin: var(--sp-2) 0 0; color: var(--c-text-dim); font-size: var(--fs-sm); }
 
   .import-msg { margin: 0 0 var(--sp-4); line-height: 1.4; }
   .import-actions { display: flex; flex-direction: column; gap: var(--sp-2); }

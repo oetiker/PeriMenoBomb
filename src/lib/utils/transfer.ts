@@ -1,9 +1,14 @@
-import { db, type Symptom, type Tag, type Entry, type MetaRow } from '$lib/db';
+import { db, CURRENT_DB_VERSION, type Symptom, type Tag, type Entry, type MetaRow } from '$lib/db';
+import { migrateBackupPayload } from '$lib/db/importMigrate';
 
 export const EXPORT_VERSION = 1 as const;
 
 export interface ExportPayload {
   version: typeof EXPORT_VERSION;
+  /** The Dexie schema version the rows are in. Stamped by current exports so an
+      import can replay an old backup through the right migrations; absent on
+      backups taken before this field existed (handled by shape detection). */
+  dbVersion?: number;
   exportedAt?: string;
   symptoms: Symptom[];
   tags: Tag[];
@@ -30,19 +35,22 @@ export async function exportAll(): Promise<ExportPayload> {
     db.entries.toArray(),
     db.meta.toArray()
   ]);
-  return { version: EXPORT_VERSION, exportedAt: new Date().toISOString(), symptoms, tags, entries, meta };
+  return { version: EXPORT_VERSION, dbVersion: CURRENT_DB_VERSION, exportedAt: new Date().toISOString(), symptoms, tags, entries, meta };
 }
 
 export async function importAll(payload: ExportPayload, mode: ImportMode): Promise<void> {
   if (!validateExportPayload(payload)) throw new Error('Ungültiges Export-Format');
+  // Replay older backups through the real migration chain so their rows match
+  // the current schema before they land in the live DB.
+  const migrated = await migrateBackupPayload(payload);
   await db.transaction('rw', db.symptoms, db.tags, db.entries, db.meta, async () => {
     if (mode === 'replace') {
       await Promise.all([db.symptoms.clear(), db.tags.clear(), db.entries.clear(), db.meta.clear()]);
     }
-    await db.symptoms.bulkPut(payload.symptoms);
-    await db.tags.bulkPut(payload.tags);
-    await db.entries.bulkPut(payload.entries);
-    await db.meta.bulkPut(payload.meta);
+    await db.symptoms.bulkPut(migrated.symptoms);
+    await db.tags.bulkPut(migrated.tags);
+    await db.entries.bulkPut(migrated.entries);
+    await db.meta.bulkPut(migrated.meta);
   });
 }
 

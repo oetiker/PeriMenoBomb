@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetDatabase } from './index';
-import { getMeta, setMeta, getOrDefault } from './meta';
+import { resetDatabase, db } from './index';
+import { getMeta, setMeta, getOrDefault, shouldShowFirstRun } from './meta';
+import { createSymptom } from './symptoms';
+import { upsertEntry } from './entries';
 
 describe('meta store', () => {
   beforeEach(() => resetDatabase());
@@ -21,5 +23,33 @@ describe('meta store', () => {
   it('getOrDefault returns stored when present', async () => {
     await setMeta('lastNDays', 30);
     expect(await getOrDefault('lastNDays', 14)).toBe(30);
+  });
+});
+
+describe('shouldShowFirstRun', () => {
+  beforeEach(() => resetDatabase());
+
+  it('returns true on a truly empty database', async () => {
+    expect(await shouldShowFirstRun()).toBe(true);
+  });
+
+  it('returns false once firstRunCompleted is set', async () => {
+    await setMeta('firstRunCompleted', true);
+    expect(await shouldShowFirstRun()).toBe(false);
+  });
+
+  it('returns false when symptoms survive but the flag was lost', async () => {
+    await createSymptom({ name: 'Hitzewallungen' });
+    expect(await shouldShowFirstRun()).toBe(false);
+  });
+
+  it('returns false when entries survive but the flag was lost', async () => {
+    await upsertEntry({ date: '2026-06-27', symptomId: 'sx' });
+    expect(await shouldShowFirstRun()).toBe(false);
+  });
+
+  it('returns false when only tags survive eviction', async () => {
+    await db.tags.add({ id: 't1', name: 'körperlich', createdAt: 1 });
+    expect(await shouldShowFirstRun()).toBe(false);
   });
 });
