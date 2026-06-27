@@ -2,6 +2,10 @@
 import { db } from './index';
 import { getMeta, setMeta } from './meta';
 import { coerceRetentionDays, backupFileName, selectForPruning } from '$lib/utils/backupRotation';
+import { gzip, encodeText } from '$lib/utils/gzip';
+import { exportAll } from '$lib/utils/transfer';
+import { recordBackupTime } from './backup';
+import { todayKey } from '$lib/utils/date';
 
 const DIR_HANDLE_KEY = 'autoBackupDirHandle';
 const ENABLED_KEY = 'autoBackupEnabled';
@@ -138,4 +142,57 @@ export async function pruneBackups(
   const { delete: del } = selectForPruning(names, today, retentionDays);
   for (const name of del) await dir.removeEntry(name);
   return del;
+}
+
+// Write today's backup file (overwriting) and prune. Silent and best-effort:
+// never throws into the caller; failures are recorded for the Settings status.
+// `withGesture` allows requesting permission (only true when called from a tap).
+export async function runAutoBackup(
+  now: number = Date.now(),
+  withGesture = false
+): Promise<'skipped' | 'ok' | 'unhealthy' | 'error'> {
+  if (!isAutoBackupSupported()) return 'skipped';
+  if (!(await isAutoBackupEnabled())) return 'skipped';
+  const dir = await getBackupDirHandle();
+  if (!dir) return 'unhealthy';
+
+  let access = await queryBackupAccess(dir);
+  if (access !== 'granted' && withGesture) {
+    access = (await requestBackupAccess(dir)) ? 'granted' : access;
+  }
+  if (access !== 'granted') {
+    await recordAutoBackupError('permission');
+    return 'unhealthy';
+  }
+
+  try {
+    const payload = await exportAll();
+    const bytes = await gzip(encodeText(JSON.stringify(payload)));
+    const day = todayKey();
+    await writeBackupFile(dir, bytes, day);
+    await pruneBackups(dir, await getRetentionDays(), day);
+    await recordAutoBackupSuccess(now);
+    await recordBackupTime(now); // keep the reminder clock consistent
+    return 'ok';
+  } catch (err) {
+    await recordAutoBackupError((err as Error)?.message ?? 'write failed');
+    return 'error';
+  }
+}
+
+export async function autoBackupHealth(): Promise<{
+  enabled: boolean;
+  healthy: boolean;
+  reason?: string;
+}> {
+  const enabled = isAutoBackupSupported() && (await isAutoBackupEnabled());
+  if (!enabled) return { enabled: false, healthy: false };
+  const dir = await getBackupDirHandle();
+  if (!dir) return { enabled: true, healthy: false, reason: 'no-folder' };
+  if ((await queryBackupAccess(dir)) !== 'granted') {
+    return { enabled: true, healthy: false, reason: 'permission' };
+  }
+  const { lastError } = await getAutoBackupStatus();
+  if (lastError) return { enabled: true, healthy: false, reason: lastError };
+  return { enabled: true, healthy: true };
 }
