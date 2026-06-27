@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { todayKey, toDateKey, fromDateKey, isValidDateKey, addDays, formatLong, daysBetweenKeys } from './date';
+import { todayKey, toDateKey, toTimeKey, fromDateKey, isValidDateKey, addDays, formatLong, daysBetweenKeys } from './date';
 
 describe('date utils', () => {
   beforeEach(() => {
@@ -14,6 +14,11 @@ describe('date utils', () => {
 
   it('toDateKey converts Date to ISO key', () => {
     expect(toDateKey(new Date('2026-01-04T15:00:00'))).toBe('2026-01-04');
+  });
+
+  it('toTimeKey returns zero-padded HHMMSS in local time', () => {
+    expect(toTimeKey(new Date('2026-05-27T09:08:07'))).toBe('090807');
+    expect(toTimeKey(new Date('2026-05-27T14:30:52'))).toBe('143052');
   });
 
   it('fromDateKey parses key back to Date at local midnight', () => {

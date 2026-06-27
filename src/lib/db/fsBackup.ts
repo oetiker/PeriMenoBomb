@@ -1,11 +1,11 @@
 // src/lib/db/fsBackup.ts
 import { db } from './index';
 import { getMeta, setMeta } from './meta';
-import { coerceRetentionDays, backupFileName, selectForPruning } from '$lib/utils/backupRotation';
+import { coerceRetentionDays, autoBackupFileName, selectForPruning } from '$lib/utils/backupRotation';
 import { gzip, encodeText } from '$lib/utils/gzip';
 import { exportAll } from '$lib/utils/transfer';
 import { recordBackupTime } from './backup';
-import { todayKey } from '$lib/utils/date';
+import { toDateKey, toTimeKey } from '$lib/utils/date';
 
 const DIR_HANDLE_KEY = 'autoBackupDirHandle';
 const ENABLED_KEY = 'autoBackupEnabled';
@@ -103,42 +103,32 @@ export async function requestBackupAccess(h: FileSystemDirectoryHandle): Promise
   }
 }
 
-// Atomic: write a temp file, then move() it onto the final name only after a
-// clean close, so an interrupted write never clobbers the last good backup.
+// Write a fresh, uniquely-named backup file. We deliberately never overwrite,
+// rename or move an existing file: Android content-URIs (the disk picker on
+// Chrome Android M132+) support neither atomic writes nor move()/rename, so the
+// previous temp-file + move() scheme failed there. Creating a new timestamped
+// file and letting pruneBackups() drop the older same-day ones uses only the two
+// operations Android does support (create + delete). The last good backup stays
+// untouched until this write closes cleanly, so an interrupted write never
+// clobbers it.
 export async function writeBackupFile(
   dir: FileSystemDirectoryHandle,
   bytes: Uint8Array,
-  dateKey: string
+  dateKey: string,
+  timeKey: string
 ): Promise<void> {
-  const finalName = backupFileName(dateKey);
-  const tmpName = `${finalName}.tmp`;
-  const tmp = await dir.getFileHandle(tmpName, { create: true });
-  const w = await tmp.createWritable();
+  const name = autoBackupFileName(dateKey, timeKey);
+  const fh = await dir.getFileHandle(name, { create: true });
+  const w = await fh.createWritable();
   // BlobPart cast mirrors gzip.ts pattern — Uint8Array<ArrayBufferLike> vs strict DOM.
-  // On write failure (e.g. disk full) abort() releases the file lock and discards
-  // the partial temp, so a leaked writable never blocks the next backup run.
+  // On write failure abort() releases the file lock and discards the partial
+  // file, so a leaked writable never blocks the next backup run.
   try {
     await w.write(new Blob([bytes as BlobPart]));
     await w.close();
   } catch (err) {
     await w.abort().catch(() => undefined);
     throw err;
-  }
-  const movable = tmp as FileSystemFileHandle & { move?(name: string): Promise<void> };
-  if (typeof movable.move === 'function') {
-    await movable.move(finalName); // replaces an existing same-day file
-  } else {
-    // Fallback for engines without move(): copy then drop the temp.
-    const out = await dir.getFileHandle(finalName, { create: true });
-    const ow = await out.createWritable();
-    try {
-      await ow.write(new Blob([bytes as BlobPart]));
-      await ow.close();
-    } catch (err) {
-      await ow.abort().catch(() => undefined);
-      throw err; // leave the temp in place; do not remove on a failed copy
-    }
-    await dir.removeEntry(tmpName);
   }
 }
 
@@ -157,14 +147,24 @@ export async function pruneBackups(
   return del;
 }
 
-// Write today's backup file (overwriting) and prune. Silent and best-effort:
-// never throws into the caller; failures are recorded for the Settings status.
+// Guards against overlapping runs. runAutoBackup is fired from several places
+// (app startup, Settings setup, and Dexie change triggers), so two invocations
+// can otherwise race onto the same per-second filename — a concurrent
+// createWritable() on the same file rejects with a lock error, surfacing a
+// spurious "backup failed". A single in-flight run is enough; a skipped trigger
+// is harmless because the next change reschedules another.
+let inFlight = false;
+
+// Write a new timestamped backup file and prune. Silent and best-effort: never
+// throws into the caller; failures are recorded for the Settings status.
 // `withGesture` allows requesting permission (only true when called from a tap).
 export async function runAutoBackup(
   now: number = Date.now(),
   withGesture = false
 ): Promise<'skipped' | 'ok' | 'unhealthy' | 'error'> {
   if (!isAutoBackupSupported()) return 'skipped';
+  if (inFlight) return 'skipped';
+  inFlight = true;
   // Whole body in try/catch: every await below (config reads, permission API,
   // export, write, prune, status writes) can theoretically reject; "best-effort"
   // means none of that escapes to the `void runAutoBackup()` callers.
@@ -184,8 +184,12 @@ export async function runAutoBackup(
 
     const payload = await exportAll();
     const bytes = await gzip(encodeText(JSON.stringify(payload)));
-    const day = todayKey();
-    await writeBackupFile(dir, bytes, day);
+    // Derive day and time from one instant so a run that crosses local midnight
+    // can never label a new-day file with the previous day's time (which would
+    // sort as "newest" and prune the day's real later backups).
+    const stamp = new Date(now);
+    const day = toDateKey(stamp);
+    await writeBackupFile(dir, bytes, day, toTimeKey(stamp));
     await pruneBackups(dir, await getRetentionDays(), day);
     await recordAutoBackupSuccess(now);
     await recordBackupTime(now); // keep the reminder clock consistent
@@ -193,6 +197,8 @@ export async function runAutoBackup(
   } catch (err) {
     await recordAutoBackupError((err as Error)?.message ?? 'write failed').catch(() => undefined);
     return 'error';
+  } finally {
+    inFlight = false;
   }
 }
 
