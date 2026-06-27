@@ -1,5 +1,6 @@
 import { db, CURRENT_DB_VERSION, type Symptom, type Tag, type Entry, type MetaRow } from '$lib/db';
 import { migrateBackupPayload } from '$lib/db/importMigrate';
+import { gzip, gunzip, isGzip, encodeText, decodeText } from '$lib/utils/gzip';
 
 export const EXPORT_VERSION = 1 as const;
 
@@ -54,8 +55,26 @@ export async function importAll(payload: ExportPayload, mode: ImportMode): Promi
   });
 }
 
-export function downloadJson(filename: string, payload: unknown): void {
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+// gzip needs the Compression Streams API. It's near-universal (Chrome 80+,
+// Firefox 113+, Safari 16.4+) but absent on older engines, so the manual-export
+// path feature-detects and falls back to plain JSON (which readImportFile still
+// reads). Auto-backup is FSA-gated (modern Chromium) so it always has gzip.
+export function isCompressionSupported(): boolean {
+  return typeof CompressionStream !== 'undefined' && typeof DecompressionStream !== 'undefined';
+}
+
+export async function gzipExport(payload: ExportPayload): Promise<Blob> {
+  const bytes = await gzip(encodeText(JSON.stringify(payload)));
+  // Uint8Array satisfies BlobPart; cast required by the project's strict tsconfig.
+  return new Blob([bytes as BlobPart], { type: 'application/gzip' });
+}
+
+// Uncompressed fallback for engines without Compression Streams.
+export function jsonExport(payload: ExportPayload): Blob {
+  return new Blob([JSON.stringify(payload)], { type: 'application/json' });
+}
+
+export function downloadBlob(filename: string, blob: Blob): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename;
@@ -65,11 +84,11 @@ export function downloadJson(filename: string, payload: unknown): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function readFileAsText(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
-    r.onerror = () => reject(r.error);
-    r.readAsText(file);
-  });
+// Read an export file regardless of compression: gzip is detected by its magic
+// bytes (so both .json and .json.gz work, by content not extension), then JSON-
+// parsed. Throws on invalid JSON for the caller to surface.
+export async function readImportFile(file: File): Promise<unknown> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const text = isGzip(bytes) ? decodeText(await gunzip(bytes)) : decodeText(bytes);
+  return JSON.parse(text);
 }

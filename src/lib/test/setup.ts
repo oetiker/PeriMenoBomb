@@ -12,3 +12,17 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
     disconnect() {}
   } as unknown as typeof ResizeObserver;
 }
+
+// jsdom may not implement Blob.stream(). Provide polyfill for Compression Streams support.
+if (typeof Blob !== 'undefined' && !Blob.prototype.stream) {
+  Blob.prototype.stream = function () {
+    const blob = this;
+    return new ReadableStream({
+      async start(controller) {
+        const buffer = await blob.arrayBuffer();
+        controller.enqueue(new Uint8Array(buffer));
+        controller.close();
+      }
+    });
+  };
+}

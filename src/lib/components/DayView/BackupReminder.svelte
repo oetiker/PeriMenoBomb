@@ -1,10 +1,12 @@
 <script lang="ts">
   let {
     daysSince,
+    broken = false,
     onBackup,
     onDismiss
   }: {
     daysSince: number | null;
+    broken?: boolean;
     onBackup: () => void;
     onDismiss: () => void;
   } = $props();
@@ -12,15 +14,21 @@
 
 <div class="reminder" role="alert">
   <p class="msg">
-    <span class="icon" aria-hidden="true">⚠</span>
-    {#if daysSince === null}
+    {#if broken}
+      <span class="icon" aria-hidden="true">⚠</span>
+      Auto-Backup unterbrochen. Bitte in den Einstellungen den Ordner erneut wählen.
+    {:else if daysSince === null}
+      <span class="icon" aria-hidden="true">⚠</span>
       Du hast noch kein Backup gemacht. Sichere deine Daten, damit nichts verloren geht.
     {:else}
+      <span class="icon" aria-hidden="true">⚠</span>
       Dein letztes Backup ist {daysSince}&nbsp;{daysSince === 1 ? 'Tag' : 'Tage'} her.
     {/if}
   </p>
   <div class="actions">
-    <button type="button" class="primary" onclick={onBackup}>Jetzt sichern</button>
+    {#if !broken}
+      <button type="button" class="primary" onclick={onBackup}>Jetzt sichern</button>
+    {/if}
     <button type="button" class="secondary" onclick={onDismiss}>Später</button>
   </div>
 </div>

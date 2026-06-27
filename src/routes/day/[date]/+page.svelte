@@ -15,6 +15,7 @@
   import { shouldShowFirstRun } from '$lib/db/meta';
   import { performBackup, getReminderDays, getLastBackupAt } from '$lib/db/backup';
   import { isBackupDue, daysSinceBackup } from '$lib/utils/backup';
+  import { autoBackupHealth } from '$lib/db/fsBackup';
   import { loadStatusItems, saveStatusItems, type StatusItem } from '$lib/db/statusBar';
   import { pendingRestore } from '$lib/stores/openDialog.svelte';
 
@@ -35,11 +36,19 @@
   // (interval edited, or a backup stamped). `daysSince` feeds the banner text.
   const backupQ = liveQuery(
     async () => {
+      const health = await autoBackupHealth();
+      // Auto-backup on and healthy → no reminder at all.
+      if (health.enabled && health.healthy) return { due: false, broken: false, daysSince: null as number | null };
+      // Auto-backup on but actually broken (no folder / permission / write error) →
+      // show the "interrupted" warning regardless of interval. 'no-backup-yet' is
+      // not broken: fall through to the ordinary reminder until the first backup runs.
+      if (health.enabled && !health.healthy && health.reason !== 'no-backup-yet')
+        return { due: true, broken: true, daysSince: null as number | null };
       const [days, last] = await Promise.all([getReminderDays(), getLastBackupAt()]);
       const now = Date.now();
-      return { due: isBackupDue(days, last, now), daysSince: daysSinceBackup(last, now) };
+      return { due: isBackupDue(days, last, now), broken: false, daysSince: daysSinceBackup(last, now) };
     },
-    { due: false, daysSince: null as number | null }
+    { due: false, broken: false, daysSince: null as number | null }
   );
   $effect(() => () => backupQ.dispose());
   let backupDismissed = $state(false);
@@ -94,6 +103,7 @@
   {#if backupQ.current.due && !backupDismissed}
     <BackupReminder
       daysSince={backupQ.current.daysSince}
+      broken={backupQ.current.broken}
       onBackup={onBackupNow}
       onDismiss={() => (backupDismissed = true)}
     />
