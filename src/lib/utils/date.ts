@@ -11,6 +11,15 @@ export function toDateKey(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+// Local-time HHMMSS, zero-padded. Used to make auto-backup filenames unique
+// within a day (no colons — illegal on filesystems and Android's SAF).
+export function toTimeKey(d: Date): string {
+  const h = String(d.getHours()).padStart(2, '0');
+  const m = String(d.getMinutes()).padStart(2, '0');
+  const s = String(d.getSeconds()).padStart(2, '0');
+  return `${h}${m}${s}`;
+}
+
 export function fromDateKey(key: string): Date {
   const [y, m, d] = key.split('-').map(Number);
   return new Date(y, m - 1, d, 0, 0, 0, 0);
