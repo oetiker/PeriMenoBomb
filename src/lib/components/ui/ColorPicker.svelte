@@ -201,11 +201,14 @@
     grid-template-columns: repeat(6, 1fr);
     gap: var(--sp-2);
   }
+  /* Compact mode shares its circle size + breathing room with the emoji grid in
+     SymptomLookModal so the two lists read as one visual language. */
   .grid.compact {
-    grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
-    gap: var(--sp-1);
+    grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+    gap: var(--sp-2);
+    justify-items: center;
   }
-  .grid.compact .swatch { max-width: 36px; max-height: 36px; }
+  .grid.compact .swatch { width: 36px; height: 36px; }
   .swatch {
     aspect-ratio: 1;
     border-radius: 50%;
@@ -214,8 +217,10 @@
     padding: 0;
   }
   .swatch.selected { border-color: var(--c-text); box-shadow: 0 0 0 2px var(--c-surface), 0 0 0 4px var(--c-text); }
+  /* The "+" reveal matches the emoji grid's custom-entry tile: dashed circle,
+     transparent fill, dimmed glyph. */
   .more {
-    background: var(--c-surface-2);
+    background: transparent;
     color: var(--c-text-dim);
     display: flex; align-items: center; justify-content: center;
     font-size: var(--fs-lg);
