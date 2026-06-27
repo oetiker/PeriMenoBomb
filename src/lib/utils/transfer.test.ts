@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDatabase, db } from '$lib/db';
-import { exportAll, importAll, validateExportPayload } from './transfer';
+import { exportAll, importAll, validateExportPayload, gzipExport, readImportFile } from './transfer';
+import { isGzip } from '$lib/utils/gzip';
 
 describe('transfer', () => {
   beforeEach(() => resetDatabase());
@@ -29,6 +30,23 @@ describe('transfer', () => {
     await importAll({ version: 1, tags: [{ id: 't1', name: 'neu', createdAt: 2 }, { id: 't2', name: 'andere', createdAt: 2 }], symptoms: [], entries: [], meta: [] }, 'merge');
     expect((await db.tags.get('t1'))?.name).toBe('neu');
     expect(await db.tags.get('t2')).toBeTruthy();
+  });
+
+  it('gzipExport produces gzip that readImportFile reads back', async () => {
+    await db.tags.add({ id: 't1', name: 'x', createdAt: 1 });
+    const payload = await exportAll();
+    const blob = await gzipExport(payload);
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    expect(isGzip(bytes)).toBe(true);
+    const file = new File([blob], 'b.json.gz');
+    const parsed = await readImportFile(file) as { tags: unknown[] };
+    expect(parsed.tags).toHaveLength(1);
+  });
+
+  it('readImportFile also reads a plain-JSON file', async () => {
+    const file = new File(['{"version":1,"symptoms":[],"tags":[],"entries":[],"meta":[]}'], 'b.json');
+    const parsed = await readImportFile(file) as { version: number };
+    expect(parsed.version).toBe(1);
   });
 
   it('imports a legacy (pre-v6) backup as readable fields/values', async () => {

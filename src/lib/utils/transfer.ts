@@ -1,5 +1,6 @@
 import { db, CURRENT_DB_VERSION, type Symptom, type Tag, type Entry, type MetaRow } from '$lib/db';
 import { migrateBackupPayload } from '$lib/db/importMigrate';
+import { gzip, gunzip, isGzip, encodeText, decodeText } from '$lib/utils/gzip';
 
 export const EXPORT_VERSION = 1 as const;
 
@@ -54,8 +55,13 @@ export async function importAll(payload: ExportPayload, mode: ImportMode): Promi
   });
 }
 
-export function downloadJson(filename: string, payload: unknown): void {
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+export async function gzipExport(payload: ExportPayload): Promise<Blob> {
+  const bytes = await gzip(encodeText(JSON.stringify(payload)));
+  // Uint8Array satisfies BlobPart; cast required by the project's strict tsconfig.
+  return new Blob([bytes as BlobPart], { type: 'application/gzip' });
+}
+
+export function downloadBlob(filename: string, blob: Blob): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename;
@@ -65,11 +71,11 @@ export function downloadJson(filename: string, payload: unknown): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function readFileAsText(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
-    r.onerror = () => reject(r.error);
-    r.readAsText(file);
-  });
+// Read an export file regardless of compression: gzip is detected by its magic
+// bytes (so both .json and .json.gz work, by content not extension), then JSON-
+// parsed. Throws on invalid JSON for the caller to surface.
+export async function readImportFile(file: File): Promise<unknown> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const text = isGzip(bytes) ? decodeText(await gunzip(bytes)) : decodeText(bytes);
+  return JSON.parse(text);
 }

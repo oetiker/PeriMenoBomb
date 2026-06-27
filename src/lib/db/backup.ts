@@ -1,5 +1,6 @@
 import { getMeta, setMeta } from './meta';
-import { exportAll, downloadJson } from '$lib/utils/transfer';
+import { exportAll, gzipExport, downloadBlob } from '$lib/utils/transfer';
+import { backupFileName } from '$lib/utils/backupRotation';
 import { todayKey } from '$lib/utils/date';
 import { coerceReminderDays } from '$lib/utils/backup';
 
@@ -34,6 +35,7 @@ export async function recordBackupTime(now: number): Promise<void> {
 // backup identically.
 export async function performBackup(now: number = Date.now()): Promise<void> {
   const payload = await exportAll();
-  downloadJson(`perimenobomb-export-${todayKey()}.json`, payload);
+  const blob = await gzipExport(payload);
+  downloadBlob(backupFileName(todayKey()), blob);
   await recordBackupTime(now);
 }
