@@ -12,6 +12,11 @@
   import { setMeta } from '$lib/db/meta';
   import { settings, SLIDER_STEP_OPTIONS, type SliderStep } from '$lib/stores/settings.svelte';
   import { snackbar } from '$lib/stores/snackbar.svelte';
+  import {
+    isAutoBackupSupported, pickBackupFolder, setBackupDirHandle, getBackupDirHandle,
+    requestBackupAccess, isAutoBackupEnabled, setAutoBackupEnabled,
+    getRetentionDays, setRetentionDays, runAutoBackup, getAutoBackupStatus, clearBackupDirHandle
+  } from '$lib/db/fsBackup';
   import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
   import InstallButton from '$lib/components/ui/InstallButton.svelte';
@@ -29,7 +34,21 @@
   // Backup-reminder interval (days; 0 = off). Edited locally, persisted on
   // change; re-read so the field reflects any coercion (clamp/floor).
   let reminderDays = $state(14);
-  onMount(async () => { reminderDays = await getReminderDays(); });
+
+  // Auto-backup state (File System Access API — Chromium desktop/Android only).
+  const autoSupported = isAutoBackupSupported();
+  let autoEnabled = $state(false);
+  let autoFolder = $state<string | null>(null);
+  let autoRetention = $state(14);
+
+  onMount(async () => {
+    reminderDays = await getReminderDays();
+    if (autoSupported) {
+      autoEnabled = await isAutoBackupEnabled();
+      autoRetention = await getRetentionDays();
+      autoFolder = (await getBackupDirHandle())?.name ?? null;
+    }
+  });
   async function onReminderDaysChange(e: Event) {
     const raw = (e.currentTarget as HTMLInputElement).value;
     await setReminderDays(raw === '' ? 0 : Number(raw));
@@ -42,6 +61,42 @@
     null as number | null
   );
   $effect(() => () => lastBackupQ.dispose());
+
+  // Live auto-backup status (last success timestamp and last error message).
+  const autoStatusQ = liveQuery<{ lastSuccess?: number; lastError?: string }>(
+    async () => (autoSupported ? getAutoBackupStatus() : {}),
+    {}
+  );
+  $effect(() => () => autoStatusQ.dispose());
+
+  async function onPickFolder() {
+    const dir = await pickBackupFolder();
+    if (!dir) return;
+    if (!(await requestBackupAccess(dir))) {
+      snackbar.show({ message: 'Schreibzugriff auf den Ordner wurde nicht erlaubt.' });
+      return;
+    }
+    await setBackupDirHandle(dir);
+    autoFolder = dir.name;
+    await setAutoBackupEnabled(true);
+    autoEnabled = true;
+    const r = await runAutoBackup(Date.now(), true);
+    snackbar.show({ message: r === 'ok' ? 'Auto-Backup eingerichtet.' : 'Ordner gewählt, Backup folgt.' });
+  }
+  async function onToggleAuto(e: Event) {
+    autoEnabled = (e.currentTarget as HTMLInputElement).checked;
+    await setAutoBackupEnabled(autoEnabled);
+    if (autoEnabled) await runAutoBackup(Date.now(), true);
+  }
+  async function onAutoRetentionChange(e: Event) {
+    await setRetentionDays((e.currentTarget as HTMLInputElement).value || 14);
+    autoRetention = await getRetentionDays();
+  }
+  async function onForgetFolder() {
+    await clearBackupDirHandle();
+    await setAutoBackupEnabled(false);
+    autoEnabled = false; autoFolder = null;
+  }
 
   let fileInput: HTMLInputElement;
 
@@ -195,6 +250,31 @@
   </p>
 </section>
 
+{#if autoSupported}
+  <section>
+    <h2>Automatisches Backup</h2>
+    <p>Wähle einen Ordner; die App legt dort täglich ein komprimiertes Backup ab und bewahrt die letzten Tage auf.</p>
+    {#if autoFolder}
+      <p class="last-backup">Ordner: <strong>{autoFolder}</strong></p>
+      <label class="field"><span>Aktiv</span>
+        <input type="checkbox" checked={autoEnabled} onchange={onToggleAuto} />
+      </label>
+      <label class="field reminder-field"><span>Aufbewahrung (Tage)</span>
+        <input type="number" min="1" max="365" inputmode="numeric" value={autoRetention} onchange={onAutoRetentionChange} />
+      </label>
+      {#if autoStatusQ.current.lastError}
+        <p class="last-backup warn-text">Auto-Backup unterbrochen – Ordner erneut wählen.</p>
+      {:else if autoStatusQ.current.lastSuccess}
+        <p class="last-backup">Letztes Auto-Backup: {new Date(autoStatusQ.current.lastSuccess).toLocaleString('de')}</p>
+      {/if}
+      <button type="button" onclick={onPickFolder}>Ordner ändern</button>
+      <button type="button" onclick={onForgetFolder}>Ordner vergessen</button>
+    {:else}
+      <button type="button" onclick={onPickFolder}>Backup-Ordner wählen</button>
+    {/if}
+  </section>
+{/if}
+
 <section>
   <h2>Tags</h2>
   <p><a href="{base}/tags">Tag-Verwaltung öffnen</a></p>
@@ -295,6 +375,7 @@
     font: inherit;
   }
   .last-backup { margin: var(--sp-2) 0 0; color: var(--c-text-dim); font-size: var(--fs-sm); }
+  .warn-text { color: var(--c-danger); }
 
   .import-msg { margin: 0 0 var(--sp-4); line-height: 1.4; }
   .import-actions { display: flex; flex-direction: column; gap: var(--sp-2); }
