@@ -1,7 +1,7 @@
 <script lang="ts">
   import { base } from '$app/paths';
   import { onMount } from 'svelte';
-  import { importAll, readFileAsText, validateExportPayload, type ExportPayload } from '$lib/utils/transfer';
+  import { importAll, readImportFile, validateExportPayload, type ExportPayload } from '$lib/utils/transfer';
   import { performBackup, getReminderDays, setReminderDays, getLastBackupAt } from '$lib/db/backup';
   import { daysSinceBackup } from '$lib/utils/backup';
   import { liveQuery } from '$lib/stores/liveQuery.svelte';
@@ -50,10 +50,9 @@
     const f = input.files?.[0];
     input.value = '';
     if (!f) return;
-    const text = await readFileAsText(f);
     let payload: unknown;
-    try { payload = JSON.parse(text); }
-    catch { snackbar.show({ message: 'Datei ist kein gültiges JSON.' }); return; }
+    try { payload = await readImportFile(f); }
+    catch { snackbar.show({ message: 'Datei konnte nicht gelesen werden.' }); return; }
     if (!validateExportPayload(payload)) {
       snackbar.show({ message: 'Datei hat nicht das erwartete Export-Format.' });
       return;
@@ -172,7 +171,7 @@
   <p>Alle Daten als JSON-Datei herunterladen (oder zurückspielen).</p>
   <button type="button" onclick={onExport}>Daten exportieren (JSON)</button>
   <button type="button" onclick={() => fileInput.click()}>Daten importieren…</button>
-  <input bind:this={fileInput} type="file" accept="application/json,.json" hidden onchange={onFile} />
+  <input bind:this={fileInput} type="file" accept="application/json,application/gzip,.json,.gz,.json.gz" hidden onchange={onFile} />
 
   <label class="field reminder-field">
     <span>Backup-Erinnerung alle … Tagen (0 = aus)</span>
