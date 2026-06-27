@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { resetDatabase } from './index';
+import { resetDatabase, db } from './index';
 import { createSymptom } from './symptoms';
 import {
   getReminderDays,
@@ -33,6 +33,13 @@ describe('backup db helpers', () => {
   it('recordBackupTime persists the timestamp', async () => {
     await recordBackupTime(12345);
     expect(await getLastBackupAt()).toBe(12345);
+  });
+
+  it('getLastBackupAt coerces a non-numeric/corrupt stored value to undefined', async () => {
+    await db.meta.put({ key: 'lastBackupAt', value: 'corrupt' });
+    expect(await getLastBackupAt()).toBeUndefined();
+    await db.meta.put({ key: 'lastBackupAt', value: Number.NaN });
+    expect(await getLastBackupAt()).toBeUndefined();
   });
 
   it('performBackup exports and records the backup time', async () => {

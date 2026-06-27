@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetDatabase } from './index';
+import { resetDatabase, db } from './index';
 import { getMeta, setMeta, getOrDefault, shouldShowFirstRun } from './meta';
 import { createSymptom } from './symptoms';
 import { upsertEntry } from './entries';
@@ -45,6 +45,11 @@ describe('shouldShowFirstRun', () => {
 
   it('returns false when entries survive but the flag was lost', async () => {
     await upsertEntry({ date: '2026-06-27', symptomId: 'sx' });
+    expect(await shouldShowFirstRun()).toBe(false);
+  });
+
+  it('returns false when only tags survive eviction', async () => {
+    await db.tags.add({ id: 't1', name: 'körperlich', createdAt: 1 });
     expect(await shouldShowFirstRun()).toBe(false);
   });
 });

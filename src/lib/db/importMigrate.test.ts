@@ -36,6 +36,20 @@ describe('detectSourceVersion', () => {
   it('treats an inputs-shaped payload as v2 (lowest non-destructive rung)', () => {
     expect(detectSourceVersion(payload({ symptoms: [legacySymptom()] as never }))).toBe(2);
   });
+
+  it('ignores a dbVersion below 2 (would hit the destructive v1→v2 path) and shape-detects', () => {
+    expect(detectSourceVersion(payload({ dbVersion: 1, symptoms: [legacySymptom()] as never }))).toBe(2);
+    expect(detectSourceVersion(payload({ dbVersion: 0, symptoms: [legacySymptom()] as never }))).toBe(2);
+  });
+
+  it('ignores a non-integer / NaN dbVersion and shape-detects', () => {
+    expect(detectSourceVersion(payload({ dbVersion: Number.NaN, symptoms: [legacySymptom()] as never }))).toBe(2);
+    expect(detectSourceVersion(payload({ dbVersion: 2.5, symptoms: [{ id: 'a', fields: [] }] as never }))).toBe(6);
+  });
+
+  it('clamps a too-new dbVersion down to current', () => {
+    expect(detectSourceVersion(payload({ dbVersion: 99 }))).toBe(6);
+  });
 });
 
 describe('migrateBackupPayload', () => {

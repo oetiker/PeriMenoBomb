@@ -17,8 +17,12 @@ export async function setReminderDays(value: unknown): Promise<void> {
 }
 
 // Epoch ms of the last successful backup, or undefined if never backed up.
+// Meta values are `unknown` at runtime and may be missing or corrupt (e.g.
+// restored from an older/hand-edited backup); coerce anything non-finite to
+// undefined so the reminder math never sees NaN and silently hides the banner.
 export async function getLastBackupAt(): Promise<number | undefined> {
-  return getMeta<number>(LAST_BACKUP_KEY);
+  const v = await getMeta<unknown>(LAST_BACKUP_KEY);
+  return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
 }
 
 export async function recordBackupTime(now: number): Promise<void> {

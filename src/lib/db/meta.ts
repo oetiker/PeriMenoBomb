@@ -23,9 +23,10 @@ export async function getOrDefault<T>(key: string, fallback: T): Promise<T> {
 // genuine first run when the flag is unset AND there is no real data to show.
 export async function shouldShowFirstRun(): Promise<boolean> {
   if (await getOrDefault('firstRunCompleted', false)) return false;
-  const [symptomCount, entryCount] = await Promise.all([
+  const [symptomCount, entryCount, tagCount] = await Promise.all([
     db.symptoms.count(),
-    db.entries.count()
+    db.entries.count(),
+    db.tags.count()
   ]);
-  return symptomCount === 0 && entryCount === 0;
+  return symptomCount === 0 && entryCount === 0 && tagCount === 0;
 }

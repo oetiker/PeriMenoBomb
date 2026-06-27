@@ -7,15 +7,22 @@ import type { ExportPayload } from '$lib/utils/transfer';
 let importSeq = 0;
 
 /** The schema version a backup payload is in.
- *  - explicit `dbVersion` (stamped by current exports) wins;
+ *  - a valid `dbVersion` (stamped by current exports) wins, clamped to current;
  *  - a `fields`-shaped symptom means it is already current;
  *  - an `inputs`-shaped symptom is pre-v6 — seed at v2, the lowest rung that
  *    already has the `inputs` shape, so the (idempotent) v3→v6 upgrades replay
  *    forward regardless of whether it was really v2/v3/v4/v5;
  *  - anything else (no symptoms, or a true v1 export) is treated as current —
- *    v1 is not recoverable here anyway (v1→v2 cleared entries by design). */
+ *    v1 is not recoverable here anyway (v1→v2 cleared entries by design).
+ *
+ *  A `dbVersion` that is not a finite integer ≥ 2 is ignored and we fall back to
+ *  shape detection: trusting it could throw (`seed.version(0)`) or, worse, seed
+ *  at v1 and run the destructive v1→v2 upgrade we deliberately step over. */
 export function detectSourceVersion(payload: ExportPayload): number {
-  if (typeof payload.dbVersion === 'number') return payload.dbVersion;
+  const dv = payload.dbVersion;
+  if (typeof dv === 'number' && Number.isInteger(dv) && dv >= 2) {
+    return Math.min(dv, CURRENT_DB_VERSION);
+  }
   const syms = payload.symptoms as unknown as Array<Record<string, unknown>>;
   if (syms.some((s) => Array.isArray(s.fields))) return CURRENT_DB_VERSION;
   if (syms.some((s) => s.inputs && typeof s.inputs === 'object')) return 2;
