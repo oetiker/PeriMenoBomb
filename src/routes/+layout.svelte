@@ -6,6 +6,8 @@
   import { loadOpenDialog, pendingRestore } from '$lib/stores/openDialog.svelte';
   import { loadSettings } from '$lib/stores/settings.svelte';
   import { requestPersistentStorage } from '$lib/db/persist';
+  import { registerAutoBackupTriggers } from '$lib/db/autoBackupTriggers';
+  import { runAutoBackup } from '$lib/db/fsBackup';
   // Imported for its side effect: registers the beforeinstallprompt/appinstalled
   // listeners at app start so the PWA install offer is never missed.
   import '$lib/stores/pwaInstall.svelte';
@@ -25,6 +27,11 @@
     // storage pressure. Best-effort and fire-and-forget: silently granted for
     // installed PWAs on Chrome, a no-op where unsupported.
     void requestPersistentStorage();
+
+    // Auto-backup: register change-triggers and write today's file on launch
+    // (no-op when unsupported / disabled / no folder).
+    registerAutoBackupTriggers();
+    void runAutoBackup();
 
     // Restore persisted user settings (e.g. slider granularity).
     await loadSettings();
