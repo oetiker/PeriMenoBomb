@@ -191,6 +191,7 @@
         <SelectInput
           value={(values[field.id] ?? null) as string | null}
           options={field.options}
+          label={field.label}
           onChange={(k) => setValue(field.id, k)}
         />
       {:else}
