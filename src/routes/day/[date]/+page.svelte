@@ -8,6 +8,8 @@
   import Fab from '$lib/components/ui/Fab.svelte';
   import FirstRun from '$lib/components/DayView/FirstRun.svelte';
   import BackupReminder from '$lib/components/DayView/BackupReminder.svelte';
+  import DataAtRiskBanner from '$lib/components/ui/DataAtRiskBanner.svelte';
+  import { persistence } from '$lib/stores/persistence.svelte';
   import { currentDate } from '$lib/stores/currentDate.svelte';
   import { liveQuery, liveQueryEffect } from '$lib/stores/liveQuery.svelte';
   import { db, type Symptom, type Entry } from '$lib/db';
@@ -15,7 +17,7 @@
   import { shouldShowFirstRun } from '$lib/db/meta';
   import { performBackup, getReminderDays, getLastBackupAt } from '$lib/db/backup';
   import { isBackupDue, daysSinceBackup } from '$lib/utils/backup';
-  import { autoBackupHealth } from '$lib/db/fsBackup';
+  import { autoBackupHealth, getBackupDirHandle, requestBackupAccess, runAutoBackup } from '$lib/db/fsBackup';
   import { loadStatusItems, saveStatusItems, type StatusItem } from '$lib/db/statusBar';
   import { pendingRestore } from '$lib/stores/openDialog.svelte';
 
@@ -55,6 +57,21 @@
   async function onBackupNow() {
     await performBackup();
   }
+  // Resume a folder backup whose permission lapsed while the PWA was backgrounded.
+  // This runs from the banner tap (a live user gesture), so requestBackupAccess()
+  // can re-grant access — silently on an installed PWA — without re-picking the
+  // folder. On success runAutoBackup writes meta, so the backup liveQuery clears
+  // the banner. If the handle is gone/denied, Settings still offers a re-pick.
+  async function onBackupResume() {
+    const dir = await getBackupDirHandle();
+    if (dir && (await requestBackupAccess(dir))) {
+      await runAutoBackup(Date.now(), true);
+    }
+  }
+
+  // Data-at-risk banner: shown when the browser can persist storage but hasn't
+  // granted it (so eviction is possible). Dismissible for the session.
+  let riskDismissed = $state(false);
 
   const entriesQ = liveQueryEffect(
     () => listEntriesForDate(currentDate.value),
@@ -100,11 +117,15 @@
 {#if showWelcomeQ.current}
   <FirstRun />
 {:else}
+  {#if persistence.atRisk && !riskDismissed}
+    <DataAtRiskBanner onDismiss={() => (riskDismissed = true)} />
+  {/if}
   {#if backupQ.current.due && !backupDismissed}
     <BackupReminder
       daysSince={backupQ.current.daysSince}
       broken={backupQ.current.broken}
       onBackup={onBackupNow}
+      onResume={onBackupResume}
       onDismiss={() => (backupDismissed = true)}
     />
   {/if}

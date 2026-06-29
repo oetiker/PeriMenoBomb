@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { requestPersistentStorage } from './persist';
+import { requestPersistentStorage, isPersistenceSupported } from './persist';
 
 function setStorage(storage: unknown): void {
   Object.defineProperty(globalThis.navigator, 'storage', { configurable: true, value: storage });
@@ -35,5 +35,19 @@ describe('requestPersistentStorage', () => {
   it('returns false when a non-secure context throws', async () => {
     setStorage({ persisted: vi.fn().mockResolvedValue(false), persist: vi.fn().mockRejectedValue(new Error('insecure')) });
     expect(await requestPersistentStorage()).toBe(false);
+  });
+});
+
+describe('isPersistenceSupported', () => {
+  it('is false when the Storage API has no persist()', () => {
+    setStorage(undefined);
+    expect(isPersistenceSupported()).toBe(false);
+    setStorage({});
+    expect(isPersistenceSupported()).toBe(false);
+  });
+
+  it('is true when persist() exists', () => {
+    setStorage({ persist: vi.fn(), persisted: vi.fn() });
+    expect(isPersistenceSupported()).toBe(true);
   });
 });

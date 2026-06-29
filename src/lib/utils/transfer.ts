@@ -1,5 +1,6 @@
 import { db, CURRENT_DB_VERSION, type Symptom, type Tag, type Entry, type MetaRow } from '$lib/db';
 import { migrateBackupPayload } from '$lib/db/importMigrate';
+import { DEVICE_LOCAL_META_KEYS } from '$lib/db/metaKeys';
 import { gzip, gunzip, isGzip, encodeText, decodeText } from '$lib/utils/gzip';
 
 export const EXPORT_VERSION = 1 as const;
@@ -30,12 +31,16 @@ export function validateExportPayload(x: unknown): x is ExportPayload {
 }
 
 export async function exportAll(): Promise<ExportPayload> {
-  const [symptoms, tags, entries, meta] = await Promise.all([
+  const [symptoms, tags, entries, allMeta] = await Promise.all([
     db.symptoms.toArray(),
     db.tags.toArray(),
     db.entries.toArray(),
     db.meta.toArray()
   ]);
+  // Drop device-local meta (the FileSystemDirectoryHandle and auto-backup status):
+  // a handle serialises to {} through JSON and would read back as a dead-but-truthy
+  // handle, silently breaking auto-backup on the restoring device. See metaKeys.ts.
+  const meta = allMeta.filter((row) => !DEVICE_LOCAL_META_KEYS.has(row.key));
   return { version: EXPORT_VERSION, dbVersion: CURRENT_DB_VERSION, exportedAt: new Date().toISOString(), symptoms, tags, entries, meta };
 }
 

@@ -10,7 +10,7 @@
   import { loadTestData } from '$lib/dev/testdata';
   import { db } from '$lib/db';
   import { setMeta } from '$lib/db/meta';
-  import { settings, SLIDER_STEP_OPTIONS, type SliderStep } from '$lib/stores/settings.svelte';
+  import { settings, loadSettings, SLIDER_STEP_OPTIONS, type SliderStep } from '$lib/stores/settings.svelte';
   import { snackbar } from '$lib/stores/snackbar.svelte';
   import {
     isAutoBackupSupported, pickBackupFolder, setBackupDirHandle, getBackupDirHandle,
@@ -20,7 +20,9 @@
   import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
   import InstallButton from '$lib/components/ui/InstallButton.svelte';
+  import DataAtRiskBanner from '$lib/components/ui/DataAtRiskBanner.svelte';
   import { pwaInstall } from '$lib/stores/pwaInstall.svelte';
+  import { persistence } from '$lib/stores/persistence.svelte';
 
   let importState = $state<{ payload: ExportPayload } | null>(null);
   let templateConfirm = $state<{ existing: number } | null>(null);
@@ -126,6 +128,10 @@
     // `s.payload` is a Svelte $state proxy (importState is reactive); IndexedDB's
     // structured clone can't serialize a proxy, so snapshot to plain objects first.
     await importAll($state.snapshot(s.payload), mode);
+    // Import writes settings into `meta`, but the in-memory settings store was
+    // loaded once at startup — re-read so the restored values (e.g. slider
+    // stepping) take effect immediately instead of after a full app reload.
+    await loadSettings();
     snackbar.show({ message: 'Import abgeschlossen.' });
   }
 
@@ -176,11 +182,17 @@
     await db.transaction('rw', db.symptoms, db.tags, db.entries, db.meta, async () => {
       await Promise.all([db.symptoms.clear(), db.tags.clear(), db.entries.clear(), db.meta.clear()]);
     });
+    // meta was cleared too — reset the in-memory settings to their defaults.
+    await loadSettings();
     snackbar.show({ message: 'Alle Daten gelöscht.' });
   }
 </script>
 
 <header class="hd"><h1>Einstellungen</h1></header>
+
+{#if persistence.atRisk}
+  <DataAtRiskBanner />
+{/if}
 
 {#if pwaInstall.isInstalled}
   <section>
