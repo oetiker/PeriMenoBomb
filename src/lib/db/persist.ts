@@ -18,3 +18,12 @@ export async function requestPersistentStorage(): Promise<boolean> {
     return false;
   }
 }
+
+// Whether the Storage persistence API exists at all. Lets callers tell "the
+// browser can't protect this data" (e.g. iOS Safari, covered by its own hint)
+// apart from "the browser could but hasn't granted it" — the latter is the
+// at-risk state worth warning about. A non-secure context (LAN testing) may
+// expose the API yet throw on use; requestPersistentStorage() swallows that.
+export function isPersistenceSupported(): boolean {
+  return typeof navigator !== 'undefined' && !!navigator.storage?.persist;
+}

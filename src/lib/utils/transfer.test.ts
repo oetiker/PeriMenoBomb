@@ -20,6 +20,25 @@ describe('transfer', () => {
     expect((await db.entries.get('2026-05-27__s1'))?.values.v1).toBe(50);
   });
 
+  it('excludes device-local meta (folder handle, auto-backup status) from the export', async () => {
+    await db.meta.bulkPut([
+      { key: 'sliderStep', value: 10 },
+      { key: 'autoBackupDirHandle', value: { fake: 'handle' } },
+      { key: 'autoBackupLastSuccess', value: 123 },
+      { key: 'autoBackupLastError', value: 'permission' },
+      { key: 'autoBackupEnabled', value: true }
+    ]);
+    const payload = await exportAll();
+    const keys = payload.meta.map((m) => m.key);
+    // Portable settings survive...
+    expect(keys).toContain('sliderStep');
+    expect(keys).toContain('autoBackupEnabled');
+    // ...device-local rows are stripped.
+    expect(keys).not.toContain('autoBackupDirHandle');
+    expect(keys).not.toContain('autoBackupLastSuccess');
+    expect(keys).not.toContain('autoBackupLastError');
+  });
+
   it('validates payload version', () => {
     expect(validateExportPayload({ version: 'bogus' } as any)).toBe(false);
     expect(validateExportPayload({ version: 1, symptoms: [], tags: [], entries: [], meta: [] })).toBe(true);

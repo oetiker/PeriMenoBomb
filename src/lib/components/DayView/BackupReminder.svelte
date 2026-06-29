@@ -3,11 +3,13 @@
     daysSince,
     broken = false,
     onBackup,
+    onResume,
     onDismiss
   }: {
     daysSince: number | null;
     broken?: boolean;
     onBackup: () => void;
+    onResume?: () => void;
     onDismiss: () => void;
   } = $props();
 </script>
@@ -16,7 +18,9 @@
   <p class="msg">
     {#if broken}
       <span class="icon" aria-hidden="true">⚠</span>
-      Auto-Backup unterbrochen. Bitte in den Einstellungen den Ordner erneut wählen.
+      Auto-Backup pausiert – der Ordnerzugriff ist abgelaufen, weil die App im
+      Hintergrund war. Tippe auf „Fortsetzen", um ihn ohne erneute Ordnerwahl
+      wiederherzustellen.
     {:else if daysSince === null}
       <span class="icon" aria-hidden="true">⚠</span>
       Du hast noch kein Backup gemacht. Sichere deine Daten, damit nichts verloren geht.
@@ -26,7 +30,11 @@
     {/if}
   </p>
   <div class="actions">
-    {#if !broken}
+    {#if broken}
+      {#if onResume}
+        <button type="button" class="primary" onclick={onResume}>Fortsetzen</button>
+      {/if}
+    {:else}
       <button type="button" class="primary" onclick={onBackup}>Jetzt sichern</button>
     {/if}
     <button type="button" class="secondary" onclick={onDismiss}>Später</button>

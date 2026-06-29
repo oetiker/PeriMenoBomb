@@ -5,7 +5,7 @@
   import { snackbar } from '$lib/stores/snackbar.svelte';
   import { loadOpenDialog, pendingRestore } from '$lib/stores/openDialog.svelte';
   import { loadSettings } from '$lib/stores/settings.svelte';
-  import { requestPersistentStorage } from '$lib/db/persist';
+  import { initPersistence } from '$lib/stores/persistence.svelte';
   import { registerAutoBackupTriggers } from '$lib/db/autoBackupTriggers';
   import { runAutoBackup } from '$lib/db/fsBackup';
   // Imported for its side effect: registers the beforeinstallprompt/appinstalled
@@ -24,9 +24,9 @@
     document.body.classList.add('app-ready');
 
     // Ask the browser to keep our IndexedDB data from being evicted under
-    // storage pressure. Best-effort and fire-and-forget: silently granted for
-    // installed PWAs on Chrome, a no-op where unsupported.
-    void requestPersistentStorage();
+    // storage pressure, and record the outcome so the UI can warn when the
+    // grant was declined (the data-at-risk banner). Best-effort, fire-and-forget.
+    void initPersistence();
 
     // Auto-backup: register change-triggers and write today's file on launch
     // (no-op when unsupported / disabled / no folder).

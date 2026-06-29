@@ -7,6 +7,7 @@
   import SelectInput from './SelectInput.svelte';
   import SymptomEditModal from '$lib/components/SymptomAdmin/SymptomEditModal.svelte';
   import { upsertEntry, getEntry, deleteEntry, validateEntry } from '$lib/db/entries';
+  import { runAutoBackupOnGesture } from '$lib/db/autoBackupTriggers';
   import { settings } from '$lib/stores/settings.svelte';
   import type { Symptom } from '$lib/db';
   import { isValidDateKey, formatLong } from '$lib/utils/date';
@@ -85,6 +86,10 @@
       symptomId: symptom.id,
       values: $state.snapshot(values)
     });
+    // Back up off this tap: the save is a live user gesture, so the backup can
+    // re-grant folder permission Chrome revoked while backgrounded (no-op unless
+    // auto-backup is set up). Fire-and-forget, kept inside the gesture window.
+    runAutoBackupOnGesture();
     await clearDialog();
     onClose();
   }
