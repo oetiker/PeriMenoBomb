@@ -18,9 +18,8 @@
   <p class="msg">
     {#if broken}
       <span class="icon" aria-hidden="true">⚠</span>
-      Auto-Backup pausiert – der Ordnerzugriff ist abgelaufen, weil die App im
-      Hintergrund war. Tippe auf „Fortsetzen", um ihn ohne erneute Ordnerwahl
-      wiederherzustellen.
+      Auto-Backup unterbrochen. Tippe auf „Fortsetzen“, um den Ordnerzugriff wiederherzustellen.
+      Falls das nicht klappt, wähle den Ordner in den Einstellungen erneut.
     {:else if daysSince === null}
       <span class="icon" aria-hidden="true">⚠</span>
       Du hast noch kein Backup gemacht. Sichere deine Daten, damit nichts verloren geht.
