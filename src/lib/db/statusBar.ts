@@ -21,10 +21,11 @@ export async function saveStatusItems(items: StatusItem[]): Promise<void> {
   await setMeta(META_KEY, items);
 }
 
-/** Days between `viewedDate` and the most recent occurrence of `symptomId` on
-    or before that date. Logged on the viewed day → 0. No occurrence on or
-    before the viewed day → null (rendered as a dash). Occurrences strictly
-    after the viewed day are ignored so the bar reflects the day in view. */
+/** Day count from the most recent occurrence of `symptomId` on or before
+    `viewedDate`, counting inclusively: logged on the viewed day → 1, the day
+    before → 2 (like "cycle day"). No occurrence on or before the viewed day →
+    null (rendered as a dash). Occurrences strictly after the viewed day are
+    ignored so the bar reflects the day in view. */
 export async function daysSinceLastOccurrence(
   symptomId: string,
   viewedDate: string
@@ -35,5 +36,5 @@ export async function daysSinceLastOccurrence(
     if (d <= viewedDate) latest = d;
     else break;
   }
-  return latest === null ? null : daysBetweenKeys(viewedDate, latest);
+  return latest === null ? null : daysBetweenKeys(viewedDate, latest) + 1;
 }
