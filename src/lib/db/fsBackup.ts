@@ -82,8 +82,9 @@ export async function pickBackupFolder(): Promise<FileSystemDirectoryHandle | nu
 }
 
 // queryPermission can reject on a stale/invalid handle in some engines; never
-// throw — a failure to determine access is treated as 'denied' so the callers
-// (runAutoBackup, autoBackupHealth) stay silent and best-effort.
+// throw — a failure to determine access is treated as 'denied', which the
+// callers (runAutoBackup, autoBackupHealth) surface as a broken backup so the
+// user gets pointed at re-picking the folder.
 export async function queryBackupAccess(h: FileSystemDirectoryHandle): Promise<PermissionState> {
   try {
     return await (h as WithPerms).queryPermission({ mode: 'readwrite' });
@@ -178,7 +179,16 @@ export async function runAutoBackup(
       access = (await requestBackupAccess(dir)) ? 'granted' : access;
     }
     if (access !== 'granted') {
-      await recordAutoBackupError('permission');
+      // 'prompt' without a gesture is the normal cold-start state on Chrome
+      // Android: closing the installed PWA demotes the folder permission, and
+      // only a future user gesture can re-grant it. Not an error — recording
+      // one would greet every app start with the "unterbrochen" banner even
+      // though the next entry save re-prompts and heals the backup by itself.
+      // Record only a real block: an explicit 'denied', or a gesture-backed
+      // re-grant prompt the user turned down.
+      if (access === 'denied' || withGesture) {
+        await recordAutoBackupError('permission');
+      }
       return 'unhealthy';
     }
 
@@ -212,7 +222,11 @@ export async function autoBackupHealth(): Promise<{
     if (!enabled) return { enabled: false, healthy: false };
     const dir = await getBackupDirHandle();
     if (!dir) return { enabled: true, healthy: false, reason: 'no-folder' };
-    if ((await queryBackupAccess(dir)) !== 'granted') {
+    // Only 'denied' is broken. 'prompt' is the expected post-restart state
+    // (see runAutoBackup) and falls through: with a clean status it counts as
+    // healthy, so no banner nags on every start. A recorded 'permission'
+    // lastError (user turned down the re-grant prompt) still surfaces below.
+    if ((await queryBackupAccess(dir)) === 'denied') {
       return { enabled: true, healthy: false, reason: 'permission' };
     }
     const { lastError, lastSuccess } = await getAutoBackupStatus();
