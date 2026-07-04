@@ -11,7 +11,10 @@
 // real Dexie table can't structured-clone functions.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-const store = new Map<string, unknown>();
+// vi.mock() calls are hoisted above ordinary declarations, so the map the
+// factory closes over must be hoisted too or it lands in the temporal dead
+// zone under some transforms.
+const store = vi.hoisted(() => new Map<string, unknown>());
 vi.mock('./meta', () => ({
   getMeta: async (key: string) => store.get(key),
   setMeta: async (key: string, value: unknown) => {
