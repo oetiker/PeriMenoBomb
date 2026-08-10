@@ -5,6 +5,7 @@
   import SliderInput from './SliderInput.svelte';
   import NumberInput from './NumberInput.svelte';
   import SelectInput from './SelectInput.svelte';
+  import CheckInput from './CheckInput.svelte';
   import SymptomEditModal from '$lib/components/SymptomAdmin/SymptomEditModal.svelte';
   import { upsertEntry, getEntry, deleteEntry, validateEntry } from '$lib/db/entries';
   import { runAutoBackupOnGesture } from '$lib/db/autoBackupTriggers';
@@ -173,10 +174,12 @@
 
   {#each symptom.fields.filter((f) => !f.deleted) as field (field.id)}
     <section>
-      <div class="caption">
-        {field.label || symptom.name}
-        {#if field.required}<span class="req">*</span>{/if}
-      </div>
+      {#if field.type !== 'check'}
+        <div class="caption">
+          {field.label || symptom.name}
+          {#if field.required}<span class="req">*</span>{/if}
+        </div>
+      {/if}
       {#if field.type === 'slider'}
         <SliderInput
           value={(values[field.id] ?? null) as number | null}
@@ -198,6 +201,12 @@
           options={field.options}
           label={field.label}
           onChange={(k) => setValue(field.id, k)}
+        />
+      {:else if field.type === 'check'}
+        <CheckInput
+          value={values[field.id] === true}
+          label={field.label || symptom.name}
+          onChange={(v) => setValue(field.id, v)}
         />
       {:else}
         <textarea

@@ -134,3 +134,50 @@ describe('EntryEditor', () => {
     expect(thumb.dataset.zone).toBe('continuous');
   });
 });
+
+describe('check fields', () => {
+  it('ticking the box stores true', async () => {
+    const f = { ...newField('check'), label: 'Nachts aufgewacht' };
+    const s = makeSymptom({ fields: [f] });
+    const { getByLabelText, getByText } = render(EntryEditor, {
+      props: { open: true, date: '2026-05-28', symptom: s, onClose: () => {} }
+    });
+    await fireEvent.click(getByLabelText('Nachts aufgewacht'));
+    await fireEvent.click(getByText('Speichern'));
+    await tick();
+    await new Promise((r) => setTimeout(r, 30));
+    const entry = await db.entries.get('2026-05-28__s1');
+    expect(entry?.values[f.id]).toBe(true);
+  });
+
+  it('unticking a previously stored box writes false so the merge in upsertEntry cannot resurrect it', async () => {
+    const f = { ...newField('check'), label: 'Nachts aufgewacht' };
+    const s = makeSymptom({ fields: [f] });
+    await db.entries.put({
+      id: '2026-05-28__s1', date: '2026-05-28', symptomId: 's1',
+      values: { [f.id]: true }, updatedAt: 0
+    });
+    const { getByLabelText, getByText } = render(EntryEditor, {
+      props: { open: true, date: '2026-05-28', symptom: s, onClose: () => {} }
+    });
+    await tick();
+    await new Promise((r) => setTimeout(r, 30));
+    await fireEvent.click(getByLabelText('Nachts aufgewacht'));
+    await fireEvent.click(getByText('Speichern'));
+    await tick();
+    await new Promise((r) => setTimeout(r, 30));
+    const entry = await db.entries.get('2026-05-28__s1');
+    expect(entry?.values[f.id]).toBe(false);
+  });
+
+  it('does not print the uppercase caption above a check field', () => {
+    const f = { ...newField('check'), label: 'Nachts aufgewacht' };
+    const s = makeSymptom({ fields: [f] });
+    const { container } = render(EntryEditor, {
+      props: { open: true, date: '2026-05-28', symptom: s, onClose: () => {} }
+    });
+    const captions = [...container.querySelectorAll('.caption')].map((n) => n.textContent?.trim());
+    // "Datum" is the date section's caption and must stay.
+    expect(captions).toEqual(['Datum']);
+  });
+});
