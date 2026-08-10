@@ -51,6 +51,10 @@ export function entryFieldDisplays(symptom: Symptom, entry: Pick<Entry, 'values'
       const label = selectOptionLabel(f, typeof v === 'string' ? v : null);
       if (!label) continue;
       out.push({ field: f, text: label });
+    } else if (f.type === 'check') {
+      // Only a tick is information. false and "never logged" read the same.
+      if (v !== true) continue;
+      out.push({ field: f, text: 'ja' });
     } else {
       if (typeof v !== 'string' || v.trim().length === 0) continue;
       out.push({ field: f, text: v });

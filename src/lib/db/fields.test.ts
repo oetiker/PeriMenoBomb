@@ -79,3 +79,26 @@ describe('entryFieldDisplays', () => {
     expect(entryFieldDisplays(s, { values: {} })).toEqual([]);
   });
 });
+
+describe('entryFieldDisplays with a check field', () => {
+  it('shows "ja" when the box is ticked', () => {
+    const f = { ...newField('check'), label: 'Nachts aufgewacht' };
+    const out = entryFieldDisplays(sym([f]), { values: { [f.id]: true } });
+    expect(out).toEqual([{ field: f, text: 'ja' }]);
+  });
+
+  it('omits the field when the value is false', () => {
+    const f = newField('check');
+    expect(entryFieldDisplays(sym([f]), { values: { [f.id]: false } })).toEqual([]);
+  });
+
+  it('omits the field when no value was logged', () => {
+    const f = newField('check');
+    expect(entryFieldDisplays(sym([f]), { values: {} })).toEqual([]);
+  });
+
+  it('omits a soft-deleted check field even when ticked', () => {
+    const f = { ...newField('check'), deleted: true };
+    expect(entryFieldDisplays(sym([f]), { values: { [f.id]: true } })).toEqual([]);
+  });
+});
