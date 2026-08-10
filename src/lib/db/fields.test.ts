@@ -28,6 +28,20 @@ describe('newField', () => {
   });
 });
 
+describe('newField("check")', () => {
+  it('mints a check field with the German default label and required=false', () => {
+    const f = newField('check');
+    expect(f.type).toBe('check');
+    expect(f.label).toBe('Zutreffend');
+    expect(f.required).toBe(false);
+    expect(f.id).toBeTruthy();
+  });
+
+  it('gives each check field a distinct id', () => {
+    expect(newField('check').id).not.toBe(newField('check').id);
+  });
+});
+
 describe('isValueField', () => {
   it('is true for slider/number/select, false for text', () => {
     expect(isValueField(newField('slider'))).toBe(true);

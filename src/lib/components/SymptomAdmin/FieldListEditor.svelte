@@ -13,7 +13,7 @@
   let { fields, daily, onFieldsChange, onDailyChange }: Props = $props();
 
   const TYPE_LABELS: Record<FieldType, string> = {
-    slider: 'Slider', number: 'Zahl', select: 'Auswahl', text: 'Notiz'
+    slider: 'Slider', number: 'Zahl', select: 'Auswahl', text: 'Notiz', check: 'Häkchen'
   };
   const ADD_ORDER: FieldType[] = ['slider', 'number', 'select', 'text'];
 

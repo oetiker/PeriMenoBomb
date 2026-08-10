@@ -11,6 +11,7 @@ export function newField(type: FieldType): MetaField {
     case 'number': return { id, type, label: 'Wert', required: false, unit: '', integer: true };
     case 'text':   return { id, type, label: 'Notiz', required: false };
     case 'select': return { id, type, label: 'Auswahl', required: false, options: [] };
+    case 'check':  return { id, type, label: 'Zutreffend', required: false };
   }
 }
 

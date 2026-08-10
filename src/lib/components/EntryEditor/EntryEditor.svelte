@@ -22,16 +22,16 @@
     date: string;
     symptom: Symptom;
     /** Optional initial values when restoring from openDialog. */
-    initial?: { values: Record<string, number | string | null> };
+    initial?: { values: Record<string, number | string | boolean | null> };
     onClose: () => void;
   };
   let { open, date, symptom, initial, onClose }: Props = $props();
 
   let workingDate = $state(untrack(() => date));
-  let values = $state<Record<string, number | string | null>>(untrack(() => ({ ...(initial?.values ?? {}) })));
+  let values = $state<Record<string, number | string | boolean | null>>(untrack(() => ({ ...(initial?.values ?? {}) })));
   let configOpen = $state(false);
 
-  function setValue(id: string, v: number | string | null) {
+  function setValue(id: string, v: number | string | boolean | null) {
     values = { ...values, [id]: v };
   }
 

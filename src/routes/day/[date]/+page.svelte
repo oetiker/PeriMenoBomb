@@ -27,7 +27,7 @@
   let sheetOpen = $state(false);
   let editing = $state<{ symptom: Symptom } | null>(null);
   let restoreInitial = $state<
-    | { values: Record<string, number | string | null>; workingDate: string }
+    | { values: Record<string, number | string | boolean | null>; workingDate: string }
     | null
   >(null);
 

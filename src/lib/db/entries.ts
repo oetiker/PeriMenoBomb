@@ -1,7 +1,7 @@
 import { db, type Entry, type Symptom, entryKey } from './index';
 import { isValidDateKey, addDays } from '$lib/utils/date';
 
-export type EntryValues = Record<string, number | string | null>;
+export type EntryValues = Record<string, number | string | boolean | null>;
 
 export interface UpsertEntryInput {
   date: string;

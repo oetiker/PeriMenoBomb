@@ -7,7 +7,7 @@ export type OpenDialogState =
       payload: {
         date: string;
         symptomId: string;
-        values: Record<string, number | string | null>;
+        values: Record<string, number | string | boolean | null>;
       };
     }
   | {
