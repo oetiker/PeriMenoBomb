@@ -3,7 +3,7 @@ import { classifyCell, valueNumberDomain, selectValueDomain, valueDomain, select
 import { newField } from '$lib/db/fields';
 import type { Entry, NumberField } from '$lib/db';
 
-const E = (values: Record<string, number | string | null>): Entry =>
+const E = (values: Record<string, number | string | boolean | null>): Entry =>
   ({ id: 'x', date: 'd', symptomId: 's', values, updatedAt: 0 });
 
 describe('classifyCell', () => {
@@ -54,6 +54,31 @@ describe('classifyCell', () => {
   it('text field → recorded', () => {
     const f = newField('text');
     expect(classifyCell(f, E({ [f.id]: 'hello' }), null)).toEqual({ kind: 'recorded', intensity: 1 });
+  });
+
+  it('check field → no normalization domain', () => {
+    const f = newField('check');
+    expect(valueDomain([E({ [f.id]: true })], f)).toBeNull();
+  });
+
+  it('check field: ticked → full-intensity value', () => {
+    const f = newField('check');
+    expect(classifyCell(f, E({ [f.id]: true }), null)).toEqual({ kind: 'value', intensity: 1 });
+  });
+
+  it('check field: unticked → none', () => {
+    const f = newField('check');
+    expect(classifyCell(f, E({ [f.id]: false }), null)).toEqual({ kind: 'none', intensity: 0 });
+  });
+
+  it('check field: no stored value → none', () => {
+    const f = newField('check');
+    expect(classifyCell(f, E({}), null)).toEqual({ kind: 'none', intensity: 0 });
+  });
+
+  it('check field: no entry → none', () => {
+    const f = newField('check');
+    expect(classifyCell(f, undefined, null)).toEqual({ kind: 'none', intensity: 0 });
   });
 });
 
@@ -154,33 +179,6 @@ describe('buildHeatmap', () => {
     expect(m.columns[0].cells[m.zeroIndex].kind).toBe('value');
     // some other offset → none
     expect(m.columns[0].cells[0].kind).toBe('none');
-  });
-});
-
-describe('check fields in the heatmap', () => {
-  const f = newField('check');
-  const entry = (values: Record<string, number | string | boolean | null>): Entry => ({
-    id: '2026-08-10__s1', date: '2026-08-10', symptomId: 's1', values, updatedAt: 0
-  });
-
-  it('has no normalization domain', () => {
-    expect(valueDomain([entry({ [f.id]: true })], f)).toBeNull();
-  });
-
-  it('paints a ticked box at full intensity', () => {
-    expect(classifyCell(f, entry({ [f.id]: true }), null)).toEqual({ kind: 'value', intensity: 1 });
-  });
-
-  it('leaves an unticked box empty', () => {
-    expect(classifyCell(f, entry({ [f.id]: false }), null)).toEqual({ kind: 'none', intensity: 0 });
-  });
-
-  it('leaves a day without the value empty', () => {
-    expect(classifyCell(f, entry({}), null)).toEqual({ kind: 'none', intensity: 0 });
-  });
-
-  it('leaves a day without any entry empty', () => {
-    expect(classifyCell(f, undefined, null)).toEqual({ kind: 'none', intensity: 0 });
   });
 });
 

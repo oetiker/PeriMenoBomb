@@ -30,6 +30,7 @@
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
+  .check:active { background: var(--c-surface-2); }
   .check input[type='checkbox'] { width: 20px; height: 20px; flex-shrink: 0; }
   .check span { font-weight: var(--fw-medium); }
 </style>

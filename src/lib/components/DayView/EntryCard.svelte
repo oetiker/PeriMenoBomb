@@ -19,7 +19,7 @@
     <div class="text">
       <div class="name">{symptom.name}</div>
       <div class="meta">
-        {#each valueDisplays as d (d.field.id)}<span>{d.text}</span>{/each}
+        {#each valueDisplays as d (d.field.id)}<span>{d.field.type === 'check' ? d.field.label : d.text}</span>{/each}
         {#if hasComment}<MessageCircle size={14} />{/if}
         {#if valueDisplays.length === 0 && !hasComment}<span class="empty">erfasst</span>{/if}
         {#if streak >= 2}

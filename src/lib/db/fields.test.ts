@@ -26,9 +26,7 @@ describe('newField', () => {
     expect(sel.label).toBe('Auswahl');
     if (sel.type === 'select') expect(sel.options).toEqual([]);
   });
-});
 
-describe('newField("check")', () => {
   it('mints a check field with the German default label and required=false', () => {
     const f = newField('check');
     expect(f.type).toBe('check');
@@ -49,9 +47,7 @@ describe('isValueField', () => {
     expect(isValueField(newField('select'))).toBe(true);
     expect(isValueField(newField('text'))).toBe(false);
   });
-});
 
-describe('isValueField with check', () => {
   it('accepts a check field as a heatmap value series', () => {
     expect(isValueField(newField('check'))).toBe(true);
   });

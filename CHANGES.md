@@ -23,9 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Check field for symptoms** (Häkchen) — a plain tick-box for sub-aspects a
   slider would be overkill for, e.g. "nachts aufgewacht" next to a hot-flush
-  intensity. Only a ticked box carries information: it shows up as `ja` on the
-  day card, in the report and in the PDF, and can drive the cycle heatmap as a
-  value series at full intensity. No "Pflicht" toggle, since an unticked box is
+  intensity. Only a ticked box carries information: its label appears as a chip
+  on the day card and in the report, it prints as `Label: ja` in the PDF, and it
+  can drive the cycle heatmap as a value series at full intensity. No "Pflicht" toggle, since an unticked box is
   a valid answer. No schema migration — the field lives in the existing
   `fields` array.
 

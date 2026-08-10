@@ -320,8 +320,12 @@
 
     <div class="legend">
       <span><i style="background: var(--c-surface-3)"></i>kein Eintrag</span>
-      <span><i style="background: {cellColor({ kind: 'value', intensity: 0.2 }, valueSym?.color ?? '#6b7280')}"></i>leicht</span>
-      <span><i style="background: {cellColor({ kind: 'value', intensity: 1 }, valueSym?.color ?? '#6b7280')}"></i>stark</span>
+      {#if valueField?.type === 'check'}
+        <span><i style="background: {cellColor({ kind: 'value', intensity: 1 }, valueSym?.color ?? '#6b7280')}"></i>angekreuzt</span>
+      {:else}
+        <span><i style="background: {cellColor({ kind: 'value', intensity: 0.2 }, valueSym?.color ?? '#6b7280')}"></i>leicht</span>
+        <span><i style="background: {cellColor({ kind: 'value', intensity: 1 }, valueSym?.color ?? '#6b7280')}"></i>stark</span>
+      {/if}
       <span><i class="zero-swatch"></i>Tag 0 = {anchorSym?.name}</span>
     </div>
   {/if}
