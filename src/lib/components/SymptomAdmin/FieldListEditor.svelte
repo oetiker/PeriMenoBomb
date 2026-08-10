@@ -15,7 +15,7 @@
   const TYPE_LABELS: Record<FieldType, string> = {
     slider: 'Slider', number: 'Zahl', select: 'Auswahl', text: 'Notiz', check: 'Häkchen'
   };
-  const ADD_ORDER: FieldType[] = ['slider', 'number', 'select', 'text'];
+  const ADD_ORDER: FieldType[] = ['slider', 'number', 'select', 'check', 'text'];
 
   const hasEnabled = $derived(fields.some((f) => !f.deleted));
   // Add-menu is a disclosure: hidden until the user opens it via "Feld hinzufügen".
@@ -147,7 +147,11 @@
             <button type="button" class="icon-action" aria-label="Feld wiederherstellen" title="Wiederherstellen" onclick={() => restoreField(f.id)}><RotateCcw size={16} /></button>
           {:else}
             <input type="text" class="label" aria-label="Bezeichnung" placeholder="z.B. Systolisch" value={f.label} oninput={(e) => patch(f.id, { label: (e.currentTarget as HTMLInputElement).value })} />
-            <label class="req"><input type="checkbox" checked={f.required} onchange={(e) => patch(f.id, { required: (e.currentTarget as HTMLInputElement).checked })} /> Pflicht</label>
+            {#if f.type !== 'check'}
+              <!-- A "required tick-box" would mean "you must tick it", which
+                   contradicts the field's meaning, so the toggle is omitted. -->
+              <label class="req"><input type="checkbox" checked={f.required} onchange={(e) => patch(f.id, { required: (e.currentTarget as HTMLInputElement).checked })} /> Pflicht</label>
+            {/if}
             <button type="button" class="icon-action" aria-label="Feld löschen" title="Löschen" onclick={() => removeField(f.id)}><Trash2 size={16} /></button>
             <button type="button" class="handle" aria-label="Verschieben" onpointerdown={(e) => startDrag(e, f.id)}><GripVertical size={18} /></button>
           {/if}
