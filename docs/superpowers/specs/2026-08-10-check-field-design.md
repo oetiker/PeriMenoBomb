@@ -41,10 +41,15 @@ Typ taucht in `entries.ts` (`EntryValues`), `EntryEditor.svelte` und
 Gespeichert wird:
 
 - angekreuzt → `values[fieldId] = true`
-- nicht angekreuzt → der Key wird aus `values` **entfernt** (kein `false`)
+- abgewählt → `values[fieldId] = false`
+- nie berührt → kein Key
 
-Damit ist „nicht angekreuzt" identisch mit „nie erfasst", was der gewählten
-Semantik entspricht und Backups klein hält.
+`false` wird bewusst geschrieben statt den Key zu löschen: `upsertEntry`
+merged (`{...existing.values, ...input.values}`), ein entfernter Key würde
+ein früher gespeichertes `true` also nicht überschreiben — das Häkchen liesse
+sich nie wieder abwählen. Für alles Sichtbare gilt trotzdem „nur angekreuzt
+zählt": `false` und fehlender Key werden in Anzeige, Report, PDF und Heatmap
+identisch behandelt (nämlich gar nicht).
 
 ## Keine DB-Migration
 
@@ -92,15 +97,15 @@ Grossbuchstaben-`.caption` **übersprungen** — das Label steht schon neben dem
 Kästchen, eine Wiederholung wäre Lärm. Alle anderen Feldtypen behalten ihre
 Caption.
 
-Der Handler setzt `setValue(field.id, true)` beim Ankreuzen und entfernt den
-Key beim Abwählen (neue Hilfsfunktion `clearValue(id)` neben `setValue`).
+Der Handler ist ein schlichtes `setValue(field.id, checked)` — keine
+Sonderbehandlung nötig.
 
 ## Anzeige
 
 `entryFieldDisplays` in `src/lib/db/fields.ts` behandelt `check` wie folgt:
 
 - `v === true` → `{ field, text: 'ja' }`
-- alles andere → Feld wird übersprungen
+- alles andere (`false`, fehlend) → Feld wird übersprungen
 
 Das ergibt „Nachts aufgewacht: ja" in `EntryCard`, `ReportEntryRow` und im
 PDF-Export (`report/pdf.ts`), die alle über diese eine Funktion gehen.
@@ -115,7 +120,7 @@ filtert über genau diese Funktion, braucht keine Änderung).
 
 - `valueDomain` gibt für `check` `null` zurück (nichts zu normalisieren)
 - `classifyCell`: `v === true` → `{ kind: 'value', intensity: 1 }`
-  (volle Symptomfarbe), sonst `NONE`
+  (volle Symptomfarbe), `false`/fehlend → `NONE`
 
 ## Validierung
 
@@ -135,8 +140,9 @@ fälschlich als Textfeld validiert wird.
 - `CheckInput.test.ts` — rendert Label, meldet true/false
 - `FieldListEditor.test.ts` — „Häkchen" hinzufügen, kein Pflicht-Toggle
   sichtbar, kein Body
-- `EntryEditor.test.ts` — Ankreuzen speichert `true`, Abwählen entfernt den
-  Key, keine Caption für `check`
+- `EntryEditor.test.ts` — Ankreuzen speichert `true`, Abwählen eines zuvor
+  gespeicherten Häkchens schreibt `false` (überlebt den Merge in
+  `upsertEntry`), keine Caption für `check`
 
 ## Bewusst nicht enthalten
 
