@@ -15,9 +15,10 @@ export function newField(type: FieldType): MetaField {
   }
 }
 
-/** Field types that can drive heatmap intensity / be picked as a value series. */
+/** Field types that can drive heatmap intensity / be picked as a value series.
+    A check field has no scale — it is on (full colour) or absent. */
 export function isValueField(f: MetaField): boolean {
-  return f.type === 'slider' || f.type === 'number' || f.type === 'select';
+  return f.type === 'slider' || f.type === 'number' || f.type === 'select' || f.type === 'check';
 }
 
 /** Human label for a stored select-option key. A soft-deleted option still

@@ -157,6 +157,33 @@ describe('buildHeatmap', () => {
   });
 });
 
+describe('check fields in the heatmap', () => {
+  const f = newField('check');
+  const entry = (values: Record<string, number | string | boolean | null>): Entry => ({
+    id: '2026-08-10__s1', date: '2026-08-10', symptomId: 's1', values, updatedAt: 0
+  });
+
+  it('has no normalization domain', () => {
+    expect(valueDomain([entry({ [f.id]: true })], f)).toBeNull();
+  });
+
+  it('paints a ticked box at full intensity', () => {
+    expect(classifyCell(f, entry({ [f.id]: true }), null)).toEqual({ kind: 'value', intensity: 1 });
+  });
+
+  it('leaves an unticked box empty', () => {
+    expect(classifyCell(f, entry({ [f.id]: false }), null)).toEqual({ kind: 'none', intensity: 0 });
+  });
+
+  it('leaves a day without the value empty', () => {
+    expect(classifyCell(f, entry({}), null)).toEqual({ kind: 'none', intensity: 0 });
+  });
+
+  it('leaves a day without any entry empty', () => {
+    expect(classifyCell(f, undefined, null)).toEqual({ kind: 'none', intensity: 0 });
+  });
+});
+
 describe('cellColor', () => {
   it('none → neutral token; value/recorded/unspez → symptom rgba', () => {
     expect(cellColor({ kind: 'none', intensity: 0 }, '#be123c')).toBe('var(--c-surface-3)');

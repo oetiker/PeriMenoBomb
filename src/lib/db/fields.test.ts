@@ -51,6 +51,12 @@ describe('isValueField', () => {
   });
 });
 
+describe('isValueField with check', () => {
+  it('accepts a check field as a heatmap value series', () => {
+    expect(isValueField(newField('check'))).toBe(true);
+  });
+});
+
 describe('selectOptionLabel', () => {
   const field: SelectField = {
     id: 'f', type: 'select', label: 'A', required: false,

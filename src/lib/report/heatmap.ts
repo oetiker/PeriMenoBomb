@@ -51,7 +51,8 @@ export function selectValueDomain(entries: Entry[], field: SelectField): NumberD
   return { min: Math.min(...nums), max: Math.max(...nums) };
 }
 
-/** Normalization domain for the selected value field (number or select). */
+/** Normalization domain for the selected value field (number or select).
+    slider, text and check need none: their intensity is fixed. */
 export function valueDomain(entries: Entry[], field: MetaField): NumberDomain | null {
   if (field.type === 'number') return valueNumberDomain(entries, field);
   if (field.type === 'select') return selectValueDomain(entries, field);
@@ -79,6 +80,10 @@ export function classifyCell(field: MetaField, entry: Entry | undefined, domain:
     if (!domain || domain.max === domain.min) return { kind: 'value', intensity: 1 };
     const t = (sv - domain.min) / (domain.max - domain.min);
     return { kind: 'value', intensity: Math.max(0, Math.min(1, t)) };
+  }
+  if (field.type === 'check') {
+    // Binary: ticked means "happened", nothing else carries information.
+    return v === true ? { kind: 'value', intensity: 1 } : NONE;
   }
   return { kind: 'recorded', intensity: 1 }; // text — presence only
 }
