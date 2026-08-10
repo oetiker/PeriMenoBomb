@@ -41,4 +41,21 @@ describe('ReportEntryRow', () => {
     render(ReportEntryRow, { entry: e3, symptom: s3, tagNames: [] });
     expect(screen.getByText('erfasst')).toBeTruthy();
   });
+
+  it('shows the field label, not "ja", for a ticked check field', () => {
+    const check = { ...newField('check'), label: 'Nachts aufgewacht' };
+    const s4: Symptom = { ...sym, fields: [check] };
+    const e4: Entry = { ...entry, values: { [check.id]: true } };
+    render(ReportEntryRow, { entry: e4, symptom: s4, tagNames: [] });
+    expect(screen.getByText('Nachts aufgewacht')).toBeTruthy();
+    expect(screen.queryByText('ja')).toBeNull();
+  });
+
+  it('leaves a slider chip unchanged', () => {
+    const slider = newField('slider');
+    const s5: Symptom = { ...sym, fields: [slider] };
+    const e5: Entry = { ...entry, values: { [slider.id]: 80 } };
+    render(ReportEntryRow, { entry: e5, symptom: s5, tagNames: [] });
+    expect(screen.getByText('80')).toBeTruthy();
+  });
 });

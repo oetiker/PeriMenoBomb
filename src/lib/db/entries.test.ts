@@ -154,4 +154,15 @@ describe('validateEntry', () => {
     } as Symptom;
     expect(validateEntry(symptom, {}).missing).toEqual([r1.id, r2.id, r3.id]);
   });
+
+  it('never blocks saving on a check field, even one flagged required', () => {
+    const f = { ...newField('check'), required: true };
+    const symptom = {
+      id: 's', name: 'S', color: '#000', icon: '⚪', tagIds: [], parentId: null,
+      sortIndex: 0, depth: 0, isFolder: false, archived: false, createdAt: 1, updatedAt: 1,
+      fields: [f], daily: false
+    } as Symptom;
+    expect(validateEntry(symptom, {})).toEqual({ ok: true, missing: [] });
+    expect(validateEntry(symptom, { [f.id]: false })).toEqual({ ok: true, missing: [] });
+  });
 });

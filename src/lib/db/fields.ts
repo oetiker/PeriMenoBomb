@@ -11,12 +11,14 @@ export function newField(type: FieldType): MetaField {
     case 'number': return { id, type, label: 'Wert', required: false, unit: '', integer: true };
     case 'text':   return { id, type, label: 'Notiz', required: false };
     case 'select': return { id, type, label: 'Auswahl', required: false, options: [] };
+    case 'check':  return { id, type, label: 'Zutreffend', required: false };
   }
 }
 
-/** Field types that can drive heatmap intensity / be picked as a value series. */
+/** Field types that can drive heatmap intensity / be picked as a value series.
+    A check field has no scale — it is on (full colour) or absent. */
 export function isValueField(f: MetaField): boolean {
-  return f.type === 'slider' || f.type === 'number' || f.type === 'select';
+  return f.type === 'slider' || f.type === 'number' || f.type === 'select' || f.type === 'check';
 }
 
 /** Human label for a stored select-option key. A soft-deleted option still
@@ -50,6 +52,10 @@ export function entryFieldDisplays(symptom: Symptom, entry: Pick<Entry, 'values'
       const label = selectOptionLabel(f, typeof v === 'string' ? v : null);
       if (!label) continue;
       out.push({ field: f, text: label });
+    } else if (f.type === 'check') {
+      // Only a tick is information. false and "never logged" read the same.
+      if (v !== true) continue;
+      out.push({ field: f, text: 'ja' });
     } else {
       if (typeof v !== 'string' || v.trim().length === 0) continue;
       out.push({ field: f, text: v });

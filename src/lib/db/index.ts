@@ -55,7 +55,7 @@ export interface SelectOption {
   deleted?: boolean;
 }
 
-export type FieldType = 'slider' | 'number' | 'text' | 'select';
+export type FieldType = 'slider' | 'number' | 'text' | 'select' | 'check';
 
 export interface BaseField {
   /** Stable identity (newId()); never changes across label edits or reorder. */
@@ -71,9 +71,13 @@ export interface SliderField extends BaseField { type: 'slider'; lowLabel: strin
 export interface NumberField extends BaseField { type: 'number'; unit: string; integer: boolean }
 export interface TextField   extends BaseField { type: 'text' }
 export interface SelectField extends BaseField { type: 'select'; options: SelectOption[] }
+/** Boolean tick-box. Carries no config beyond BaseField — the label IS the
+    question ("nachts aufgewacht"). Only a `true` value is ever surfaced;
+    `false` and a missing key read identically everywhere. */
+export interface CheckField extends BaseField { type: 'check' }
 /** One ordered, UUID-keyed metadata field on a symptom. A symptom may carry any
     number of these, in any mix of types. */
-export type MetaField = SliderField | NumberField | TextField | SelectField;
+export type MetaField = SliderField | NumberField | TextField | SelectField | CheckField;
 
 export function defaultSymptomFields(): MetaField[] {
   return [];
@@ -84,9 +88,9 @@ export interface Entry {
   date:        string;
   symptomId:   string;
   /** Logged values keyed by field id. slider/number → number|null; text →
-      string; select → chosen option key (string) | null. A missing key means
-      the field was not logged. */
-  values: Record<string, number | string | null>;
+      string; select → chosen option key (string) | null; check → boolean.
+      A missing key means the field was not logged. */
+  values: Record<string, number | string | boolean | null>;
   updatedAt:   number;
 }
 

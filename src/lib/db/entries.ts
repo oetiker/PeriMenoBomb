@@ -1,7 +1,7 @@
 import { db, type Entry, type Symptom, entryKey } from './index';
 import { isValidDateKey, addDays } from '$lib/utils/date';
 
-export type EntryValues = Record<string, number | string | null>;
+export type EntryValues = Record<string, number | string | boolean | null>;
 
 export interface UpsertEntryInput {
   date: string;
@@ -61,9 +61,11 @@ export function validateEntry(symptom: Symptom, values: EntryValues): EntryValid
       if (v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v))) missing.push(f.id);
     } else if (f.type === 'select') {
       if (v === null || v === undefined || v === '') missing.push(f.id);
-    } else { // text
+    } else if (f.type === 'text') {
       if (typeof v !== 'string' || v.trim().length === 0) missing.push(f.id);
     }
+    // check: an unticked box is a valid answer, so `required` is meaningless
+    // and never enforced. The config UI hides the toggle entirely.
   }
   return { ok: missing.length === 0, missing };
 }
