@@ -2,7 +2,8 @@ import { db, type Symptom } from '$lib/db';
 import { importTemplate } from '$lib/templates/import';
 import { DEFAULT_TEMPLATE } from '$lib/templates/perimeno-default';
 import { upsertEntry } from '$lib/db/entries';
-import { listAllSymptoms } from '$lib/db/symptoms';
+import { listAllSymptoms, updateSymptom } from '$lib/db/symptoms';
+import { newField } from '$lib/db/fields';
 import { todayKey, addDays } from '$lib/utils/date';
 
 export interface TestDataResult {
@@ -31,24 +32,34 @@ export async function loadTestData(): Promise<TestDataResult> {
   const schlaf = byName('Schlafqualität');
   const kaffee = byName('Kaffee');
 
+  // Give one symptom a check field too, so the manual smoke test and the
+  // heatmap-with-check path have something to exercise.
+  if (mued && !mued.fields.some((f) => f.type === 'check')) {
+    const wach = newField('check');
+    if (wach.type === 'check') wach.label = 'Nachts aufgewacht';
+    mued.fields = [...mued.fields, wach];
+    await updateSymptom(mued.id, { fields: mued.fields });
+  }
+
   const today = todayKey();
   let entries = 0;
 
   // Resolve the id of a symptom's first non-deleted field of the given type, so
   // the seeded value lands under the right field key in the entry's value map.
-  const fieldId = (sym: Symptom | undefined, type: 'slider' | 'number' | 'text'): string | null =>
+  const fieldId = (sym: Symptom | undefined, type: 'slider' | 'number' | 'text' | 'check'): string | null =>
     sym?.fields.find((f) => !f.deleted && f.type === type)?.id ?? null;
 
   const put = async (
     sym: Symptom | undefined,
     date: string,
-    spec: { slider?: number | null; number?: number | null; comment?: string }
+    spec: { slider?: number | null; number?: number | null; comment?: string; check?: boolean }
   ) => {
     if (!sym) return;
-    const values: Record<string, number | string | null> = {};
+    const values: Record<string, number | string | boolean | null> = {};
     if (spec.slider !== undefined) { const id = fieldId(sym, 'slider'); if (id) values[id] = spec.slider; }
     if (spec.number !== undefined) { const id = fieldId(sym, 'number'); if (id) values[id] = spec.number; }
     if (spec.comment !== undefined) { const id = fieldId(sym, 'text'); if (id) values[id] = spec.comment; }
+    if (spec.check !== undefined) { const id = fieldId(sym, 'check'); if (id) values[id] = spec.check; }
     await upsertEntry({ date, symptomId: sym.id, values });
     entries++;
   };
@@ -80,7 +91,7 @@ export async function loadTestData(): Promise<TestDataResult> {
     const wave = (period: number, phase: number, base: number, amp: number) =>
       Math.max(1, Math.min(100, Math.round(base + amp * Math.sin(d / period + phase))));
     if (d % 7 !== 6) await put(reiz, date, { slider: wave(6, 0, 45, 35) }); // skips ~1 day/week
-    if (d % 9 !== 0) await put(mued, date, { slider: wave(8, 1, 50, 30) });
+    if (d % 9 !== 0) await put(mued, date, { slider: wave(8, 1, 50, 30), check: d % 3 === 0 });
     if (d % 6 !== 5) await put(schlaf, date, { slider: wave(5, 2, 55, 25) });
     if (d % 3 === 0) await put(kaffee, date, { number: 1 + (d % 3) });
   }

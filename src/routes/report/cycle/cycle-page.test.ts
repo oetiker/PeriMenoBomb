@@ -47,6 +47,24 @@ describe('Cycle heatmap page', () => {
     }, { timeout: 2000 });
   });
 
+  it('shows a single "angekreuzt" swatch, not the leicht/stark gradient, when the value field is a check', async () => {
+    const anchor = await createSymptom({ name: 'Start Mens' });
+    const check = newField('check');
+    const value = await createSymptom({ name: 'Nachtschweiß', fields: [check] });
+    await upsertEntry({ date: '2026-05-18', symptomId: anchor.id, values: {} });
+    await upsertEntry({ date: '2026-05-17', symptomId: value.id, values: { [check.id]: true } });
+    await setMeta('report.cycle.anchorId', anchor.id);
+    await setMeta('report.cycle.valueId', value.id);
+    await setMeta('report.cycle.valueFieldId', check.id);
+    render(Page);
+    await flush();
+    await waitFor(() => {
+      expect(screen.getByText('angekreuzt')).toBeTruthy();
+      expect(screen.queryByText('leicht')).toBeNull();
+      expect(screen.queryByText('stark')).toBeNull();
+    }, { timeout: 2000 });
+  });
+
   it('offers one focus option per value field labeled "Symptom [Feld]"', async () => {
     const anchor = await createSymptom({ name: 'Start Mens' });
     const sys = newField('number'); if (sys.type === 'number') sys.label = 'Systolisch';

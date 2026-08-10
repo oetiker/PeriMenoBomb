@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (hidden from the live dropdown, kept for past entries, restorable). Dexie
   schema **v5** backfills the new field on existing symptoms.
 
+- **Check field for symptoms** (Häkchen) — a plain tick-box for sub-aspects a
+  slider would be overkill for, e.g. "nachts aufgewacht" next to a hot-flush
+  intensity. Only a ticked box carries information: its label appears as a chip
+  on the day card and in the report, it prints as `Label: ja` in the PDF, and it
+  can drive the cycle heatmap as a value series at full intensity. No "Pflicht" toggle, since an unticked box is
+  a valid answer. No schema migration — the field lives in the existing
+  `fields` array.
+
 - **Cycle heatmap** (`/report/cycle`) — per-symptom intensity over time on a
   fixed-axis grid with pan/zoom/pinch and a day-0 reference line.
 - **"Days since last symptom" view** (`/report/since`) — counters plus the

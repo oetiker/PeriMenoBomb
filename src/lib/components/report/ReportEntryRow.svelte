@@ -16,7 +16,7 @@
     <div class="name">{symptom.name}</div>
     <div class="meta">
       {#each displays as d (d.field.id)}
-        <span class:comment={d.field.type === 'text'}>{d.text}</span>
+        <span class:comment={d.field.type === 'text'}>{d.field.type === 'check' ? d.field.label : d.text}</span>
       {/each}
       {#if displays.length === 0}<span class="empty">erfasst</span>{/if}
     </div>

@@ -3,7 +3,7 @@ import { classifyCell, valueNumberDomain, selectValueDomain, valueDomain, select
 import { newField } from '$lib/db/fields';
 import type { Entry, NumberField } from '$lib/db';
 
-const E = (values: Record<string, number | string | null>): Entry =>
+const E = (values: Record<string, number | string | boolean | null>): Entry =>
   ({ id: 'x', date: 'd', symptomId: 's', values, updatedAt: 0 });
 
 describe('classifyCell', () => {
@@ -54,6 +54,31 @@ describe('classifyCell', () => {
   it('text field → recorded', () => {
     const f = newField('text');
     expect(classifyCell(f, E({ [f.id]: 'hello' }), null)).toEqual({ kind: 'recorded', intensity: 1 });
+  });
+
+  it('check field → no normalization domain', () => {
+    const f = newField('check');
+    expect(valueDomain([E({ [f.id]: true })], f)).toBeNull();
+  });
+
+  it('check field: ticked → full-intensity value', () => {
+    const f = newField('check');
+    expect(classifyCell(f, E({ [f.id]: true }), null)).toEqual({ kind: 'value', intensity: 1 });
+  });
+
+  it('check field: unticked → none', () => {
+    const f = newField('check');
+    expect(classifyCell(f, E({ [f.id]: false }), null)).toEqual({ kind: 'none', intensity: 0 });
+  });
+
+  it('check field: no stored value → none', () => {
+    const f = newField('check');
+    expect(classifyCell(f, E({}), null)).toEqual({ kind: 'none', intensity: 0 });
+  });
+
+  it('check field: no entry → none', () => {
+    const f = newField('check');
+    expect(classifyCell(f, undefined, null)).toEqual({ kind: 'none', intensity: 0 });
   });
 });
 

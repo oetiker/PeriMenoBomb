@@ -26,6 +26,18 @@ describe('newField', () => {
     expect(sel.label).toBe('Auswahl');
     if (sel.type === 'select') expect(sel.options).toEqual([]);
   });
+
+  it('mints a check field with the German default label and required=false', () => {
+    const f = newField('check');
+    expect(f.type).toBe('check');
+    expect(f.label).toBe('Zutreffend');
+    expect(f.required).toBe(false);
+    expect(f.id).toBeTruthy();
+  });
+
+  it('gives each check field a distinct id', () => {
+    expect(newField('check').id).not.toBe(newField('check').id);
+  });
 });
 
 describe('isValueField', () => {
@@ -34,6 +46,10 @@ describe('isValueField', () => {
     expect(isValueField(newField('number'))).toBe(true);
     expect(isValueField(newField('select'))).toBe(true);
     expect(isValueField(newField('text'))).toBe(false);
+  });
+
+  it('accepts a check field as a heatmap value series', () => {
+    expect(isValueField(newField('check'))).toBe(true);
   });
 });
 
@@ -63,5 +79,28 @@ describe('entryFieldDisplays', () => {
     const nu = newField('number');
     const s = sym([nu]);
     expect(entryFieldDisplays(s, { values: {} })).toEqual([]);
+  });
+});
+
+describe('entryFieldDisplays with a check field', () => {
+  it('shows "ja" when the box is ticked', () => {
+    const f = { ...newField('check'), label: 'Nachts aufgewacht' };
+    const out = entryFieldDisplays(sym([f]), { values: { [f.id]: true } });
+    expect(out).toEqual([{ field: f, text: 'ja' }]);
+  });
+
+  it('omits the field when the value is false', () => {
+    const f = newField('check');
+    expect(entryFieldDisplays(sym([f]), { values: { [f.id]: false } })).toEqual([]);
+  });
+
+  it('omits the field when no value was logged', () => {
+    const f = newField('check');
+    expect(entryFieldDisplays(sym([f]), { values: {} })).toEqual([]);
+  });
+
+  it('omits a soft-deleted check field even when ticked', () => {
+    const f = { ...newField('check'), deleted: true };
+    expect(entryFieldDisplays(sym([f]), { values: { [f.id]: true } })).toEqual([]);
   });
 });
